@@ -4,6 +4,7 @@ import random
 import os.path
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import tensorflow as tf
 from tensorflow.keras.models import *
@@ -11,6 +12,7 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
+from tensorflow.keras.callbacks import History
 
 MODEL_PATH_PREFFIX = "./model/"
 
@@ -89,13 +91,6 @@ class HumanVsRnd:
         self.model_state = ModelState.UNINITIALIZED
         self.model = None
         """model"""
-
-    def seed(self, seed = 0):
-        """set seed for all rnd"""
-
-        random.seed(seed)
-        tf.random.set_seed(seed)
-        np.random.seed(seed)
 
     # data
 
@@ -300,7 +295,8 @@ class HumanVsRnd:
 
     def train_model(self, save_model_name = None,
                             batch_size = 32,
-                            epochs = 10):
+                            epochs = 10,
+                            display_history = True):
 
         assert(self.data_state is DataState.READY)
         assert(self.random_data_state is DataState.READY)
@@ -313,11 +309,14 @@ class HumanVsRnd:
 
         print(f"\n[i] training started\n")
 
-        self.model.fit(x = train_data, y = train_data_labels,
+        history = self.model.fit(x = train_data, y = train_data_labels,
                         batch_size = batch_size,
                         epochs = epochs)
 
         print(f"\n[i] training ended\n")
+
+        if display_history:
+            self.display_stats(history.history)
 
         self.model_state = ModelState.TRAINED
 
@@ -375,6 +374,38 @@ class HumanVsRnd:
 
             else:
                 self.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
+
+    # stats, other varius methods
+
+    def seed(self, seed = 0):
+        """set seed for all rnd"""
+
+        random.seed(seed)
+        tf.random.set_seed(seed)
+        np.random.seed(seed)
+
+    def display_stats(self, stats: dict):
+        """display stats
+            (currently only for accuracy and loss)"""
+
+        assert('accuracy' in stats.keys() and 'loss' in stats.keys())
+
+        epoch_axis = [i for i in range(1, len(stats['accuracy']) + 1)]
+
+        fig, acc_loss_epoch = plt.subplots(1)
+        
+        acc_loss_epoch.plot(epoch_axis,
+                            stats['accuracy'],
+                            color = 'green',
+                            label = 'accuracy')
+
+        acc_loss_epoch.plot(epoch_axis,
+                            stats['loss'],
+                            color = 'blue',
+                            label = 'loss')
+
+        acc_loss_epoch.legend(loc = "upper left")
+        plt.show()
 
 if __name__ == "__main__":
 
