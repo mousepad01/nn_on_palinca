@@ -1,5 +1,7 @@
 from enum import Enum
+from math import floor
 import random
+import os.path
 
 import numpy as np
 
@@ -9,6 +11,8 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
+
+MODEL_PATH_PREFFIX = "./model/"
 
 class DataState(Enum):
     
@@ -274,6 +278,16 @@ class HumanVsRnd:
 
         self.model_state = ModelState.UNTRAINED
 
+    def load_best_model(self):
+
+        with open(f"{MODEL_PATH_PREFFIX}best_accuracy.txt", "rb") as bestscore_f:
+            bestscore = int.from_bytes(bestscore_f.read(8), 'little')
+            model_path = bestscore_f.read().decode()
+
+        print(f"[i] loading model with validation accuracy {bestscore / 1000}")
+
+        self.load_model_(model_path)
+
     def load_model_(self, model_path):
 
         assert(self.model_state is ModelState.UNINITIALIZED)
@@ -284,8 +298,8 @@ class HumanVsRnd:
     def save_model_(self, model_path):
         self.model.save(model_path)
 
-    def train_model(self, save_model_path = None,
-                            batch_size = None,
+    def train_model(self, save_model_name = None,
+                            batch_size = 32,
                             epochs = 10):
 
         assert(self.data_state is DataState.READY)
@@ -307,10 +321,10 @@ class HumanVsRnd:
 
         self.model_state = ModelState.TRAINED
 
-        if save_model_path is not None:
-            self.save_model_(save_model_path)
+        if save_model_name is not None:
+            self.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
 
-    def validate(self, save_model = True, save_if_best = True):
+    def validate(self, save_model_name = None, save_if_best = True):
         
         assert(self.v_data_state is DataState.READY)
         assert(self.v_random_data_state is DataState.READY)
@@ -329,15 +343,46 @@ class HumanVsRnd:
 
         print(f"[*] validation ended: {validate_data_predictions}")
 
-        # TODO save model
+        if save_model_name is not None:
+
+            if save_if_best:
+
+                best_score_path = f"{MODEL_PATH_PREFFIX}best_accuracy.txt"
+                
+                if os.path.isfile(best_score_path):
+                    
+                    with open(best_score_path, "rb") as bestscore_f:
+                        bestscore = int.from_bytes(bestscore_f.read(8), 'little')
+
+                    current_score = validate_data_predictions['accuracy']
+                    current_score = floor(current_score * 1000)
+
+                    if current_score > bestscore:
+
+                        with open(best_score_path, "wb+") as bestscore_f:
+                            bestscore_f.write(int.to_bytes(current_score, 8, 'little'))
+                            bestscore_f.write(save_model_name.encode())
+
+                        model.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
+
+                else:
+
+                    with open(best_score_path, "wb+") as bestscore_f:
+                        bestscore_f.write(int.to_bytes(0, 8, 'little'))
+                        bestscore_f.write(save_model_name.encode())
+                        
+                    self.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
+
+            else:
+                self.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
 
 if __name__ == "__main__":
 
     model = HumanVsRnd()
-    model.seed(0)
+    model.seed(123)
 
     model.prep_data()
 
     model.init_model()
     model.train_model()
-    model.validate()
+    model.validate(save_model_name = "bestmodel")
