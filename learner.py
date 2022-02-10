@@ -32,12 +32,12 @@ class HumanVsRnd:
         and random keystroke timestamps"""
 
     def __init__(self, data_path = "timestamps.bin",
-                        new_timeslice_thresh = 5,
+                        new_timeslice_thresh = 4,
                         micros_to_ms = 1000,
-                        timeslice_len = 10,
+                        timeslice_len = 15,
                         random_to_human_ratio = 1.5,
-                        random_min_decal = 200,
-                        random_max_decal = 2000,
+                        random_min_decal = 80,
+                        random_max_decal = 300,
                         validation_ratio = 0.2,
                         ):
 
