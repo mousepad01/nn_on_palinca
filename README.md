@@ -1,4 +1,4 @@
-# Can a simple neural network model pradict who's behind keystrokes?
+# Can a simple neural network model predict who's behind keystrokes?
 This is a simple experiment, to verify whether a (basic) nn model 
 can detect patterns in keystroke timestamps
 
