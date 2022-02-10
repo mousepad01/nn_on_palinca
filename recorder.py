@@ -1,4 +1,3 @@
-from threading import Thread
 import os
 from struct import Struct
 from time import sleep
@@ -16,7 +15,7 @@ EV_REP = 0x14
 input_event = Struct("llHHi")
 # TODO a wrapper for this ugly ass struct format would be nice 
 
-def detect_pissible_keyboards():
+def detect_possible_keyboards():
     """parses /proc/bus/input/devices to find
         candidates for keyboard"""
     
@@ -25,7 +24,7 @@ def detect_pissible_keyboards():
         # candidates
         devices_list = []
 
-        devices_desc = devices.read(2 ** 14).decode().split("\n\n")
+        devices_desc = devices.read(2 ** 16).decode().split("\n\n")
         
         for d in devices_desc:
 
@@ -141,7 +140,7 @@ def readloop(keyboard_path, data_path):
 
 if __name__ == "__main__":
 
-    devices_list = detect_pissible_keyboards()
+    devices_list = detect_possible_keyboards()
     keyboard_path = filter_candidates(devices_list)
 
     readloop(keyboard_path, DATA_PATH)
