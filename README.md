@@ -8,3 +8,5 @@ and recording timestamps every time a key is pressed (w/o key releases)
 Currently (first phase) would be to determine an upper limit for the accuracy
 by training the model to differentiate between random sequences of timestamps (with frequency in given range)
 and real keystroke timestamp sequences
+
+(Linux only)
