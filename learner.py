@@ -3,6 +3,8 @@ from math import floor
 import random
 import os.path
 
+from model import Res1D
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -14,7 +16,7 @@ from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
 from tensorflow.keras.callbacks import History
 
-MODEL_PATH_PREFFIX = "./model/"
+MODEL_PATH_PREFFIX = "./model_data/"
 
 class DataState(Enum):
     
@@ -237,17 +239,17 @@ class HumanVsRnd:
         self.model = Sequential([
             InputLayer(input_shape = (self.timeslice_len, 1)),
 
-            Conv1D(16, kernel_size = 4),
+            Res1D(16, kernel_size = 4),
             BatchNormalization(),
             ReLU(),
             #MaxPool1D(2),
 
-            Conv1D(32, kernel_size = 3),
+            Res1D(32, kernel_size = 3),
             BatchNormalization(),
             ReLU(),
             #MaxPool1D(2),
 
-            Conv1D(64, kernel_size = 3),
+            Res1D(64, kernel_size = 3),
             BatchNormalization(),
             ReLU(),
             #MaxPool1D(2),
@@ -291,7 +293,7 @@ class HumanVsRnd:
         self.model_state = ModelState.TRAINED
 
     def save_model_(self, model_path):
-        self.model.save(model_path)
+        self.model.save(model_path, overwrite=True)
 
     def train_model(self, save_model_name = None,
                             batch_size = 32,
@@ -375,6 +377,8 @@ class HumanVsRnd:
             else:
                 self.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
 
+        return validate_data_predictions
+
     # stats, other varius methods
 
     def seed(self, seed = 0):
@@ -409,7 +413,7 @@ class HumanVsRnd:
 
 if __name__ == "__main__":
 
-    model = HumanVsRnd()
+    model = HumanVsRnd(data_path = "./timestamps.bin")
     model.seed(123)
 
     model.prep_data()

@@ -2,6 +2,6 @@
 **/__pycache__/
 /.vscode
 timestamps.bin
-/model
+/model_data
 local*
 /local

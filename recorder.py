@@ -132,7 +132,7 @@ def readloop(keyboard_path, data_path):
                 # (seconds since epoch, miliseconds) 
                 # (check input_event struct /include/linux/input.h)
                 data.write(int.to_bytes(ev[0], 8, 'little') + int.to_bytes(ev[1], 8, 'little'))
-
+              
                 idx += 1
                 if idx == FLUSH_THRESH:
                     data.flush()
