@@ -90,7 +90,7 @@ class Evolvable:
                         use_res=True,
 
                         epoch_cnt=20,
-                        population_cnt=20,
+                        population_cnt=2,
 
                         elite_cnt=2,
                         selection_luck=0.1,
@@ -248,18 +248,24 @@ class Evolvable:
             if self.population[idx][1] is not None:
                 continue
 
-            nn = self.build_nn(self.population[idx][0])
+            try:
 
-            self.learner.model = nn
-            self.learner.model.compile(optimizer = SGD(1e-4, 0.9), 
-                                        loss = CategoricalCrossentropy(), 
-                                        metrics = ['accuracy'])
+                nn = self.build_nn(self.population[idx][0])
 
-            self.learner.model_state = ModelState.UNTRAINED
-            self.learner.train_model(save_model_name=None)
+                self.learner.model = nn
+                self.learner.model.compile(optimizer = SGD(1e-4, 0.9), 
+                                            loss = CategoricalCrossentropy(), 
+                                            metrics = ['accuracy'])
 
-            validation_results = self.learner.validate(save_model_name = "evolved_best_model")
-            self.population[idx][1] = validation_results["accuracy"]
+                self.learner.model_state = ModelState.UNTRAINED
+                self.learner.train_model(save_model_name=None, display_history=False,
+                                            epochs=2)
+
+                validation_results = self.learner.validate(save_model_name = "evolved_best_model")
+                self.population[idx][1] = validation_results["accuracy"][-1]
+
+            except Exception:
+                self.population[idx][1] = 0.0
 
     def selection(self):
         """perform selection on self.population
@@ -267,9 +273,12 @@ class Evolvable:
         * elitism applied on the first self.elite_cnt inidividuals
         * the first third of the population is kept
         * 1/10th of remaining individuals are randomly selected and kept"""
-        
+
         self.fitness()
+        print(f"before {self.population}")
         self.population.sort(key = lambda x: x[1])
+
+        print(f"after {self.population}")
 
         print(f"[*] best from current population: {self.population[-1][1]}")
 
@@ -299,7 +308,6 @@ class Evolvable:
             self.crossover()
             self.refill()
 
-        # TODO return / save the best config
         self.fitness()
         
     def mutate(self):
@@ -375,7 +383,7 @@ class Evolvable:
         """method that re-integrates elites
             and refills self.population with random new chromosomes"""
 
-        self.population.append(self._elites)
+        self.population.extend(self._elites)
 
-        for c in range(self.population_cnt - len(self.population)):
+        for c in self.random_chromosome(self.population_cnt - len(self.population)):
             self.population.append([c, None])
