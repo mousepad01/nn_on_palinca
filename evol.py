@@ -235,13 +235,16 @@ class Evolvable:
 
     def fitness(self):
         """perform fitness function evaluation
-            on all self.population"""
+            on all self.population which have associated score == 'None'"""
 
         optimizer = SGD(1e-4, 0.9),
         loss = CategoricalCrossentropy(), 
         metrics = ['accuracy']
         
         for idx in range(self.population_cnt):
+
+            if self.population[idx][1] is not None:
+                continue
 
             nn = self.build_nn(self.population[idx][0])
 
@@ -290,7 +293,8 @@ class Evolvable:
             
             self.selection()
             self.mutate()
-            self.recombinate()
+            self.crossover()
+            self.refill()
 
         self.fitness()
         # TODO return / save the best config
@@ -326,11 +330,10 @@ class Evolvable:
             self.population[idx][0] |= mask_0to1
             self.population[idx][0] &= ~mask_1to0
 
-            # self.population[idx][1] (i.e. the score) does not need to be updated
+            self.population[idx][1] = None
 
     def crossover(self):
-        """perform crossover on all self.population
-            for selecting """
+        """perform crossover on all self.population"""
 
         for idx in range(len(self.population)):
 
@@ -360,6 +363,16 @@ class Evolvable:
                     self.population[idx][0] = fst
                     self.population[waiting_crossover][0] = snd
 
-                    # self.population[idx][1] (i.e. the score) does not need to be updated
+                    self.population[idx][1] = None
+                    self.population[waiting_crossover][1] = None
 
                     waiting_crossover = None
+
+    def refill(self):
+        """method that re-integrates elites
+            and refills self.population with random new chromosomes"""
+
+        self.population.append(self._elites)
+
+        for c in range(self.population_cnt - len(self.population)):
+            self.population.append([c, None])
