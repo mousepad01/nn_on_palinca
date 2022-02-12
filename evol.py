@@ -1,6 +1,7 @@
 import random
 from enum import Enum
 from copy import deepcopy
+import time
 
 import tensorflow as tf
 import numpy as np
@@ -262,9 +263,10 @@ class Evolvable:
                                             epochs=2)
 
                 validation_results = self.learner.validate(save_model_name = "evolved_best_model")
-                self.population[idx][1] = validation_results["accuracy"][-1]
+                self.population[idx][1] = validation_results["accuracy"]
 
-            except Exception:
+            except Exception as err:
+                print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!error {err}")
                 self.population[idx][1] = 0.0
 
     def selection(self):
@@ -272,21 +274,21 @@ class Evolvable:
         heuristic:
         * elitism applied on the first self.elite_cnt inidividuals
         * the first third of the population is kept
-        * 1/10th of remaining individuals are randomly selected and kept"""
+        * a few remaining individuals are randomly selected and kept 
+            (self.selection luck parameter)"""
 
         self.fitness()
-        print(f"before {self.population}")
-        self.population.sort(key = lambda x: x[1])
-
-        print(f"after {self.population}")
+        self.population.sort(key = lambda x: -1 if x[1] is None else x[1])
 
         print(f"[*] best from current population: {self.population[-1][1]}")
 
         self._elites = deepcopy(self.population[-2:])
 
-        new_population = self.population[self.population_cnt // 3:]
+        new_population = self.population[self.population_cnt * 2 // 3:]
+
+        lucky_cnt = min(self._selection_luck, self.population_cnt - len(self.population))
         
-        for _ in range(self._selection_luck):
+        for _ in range(lucky_cnt):
             new_population.append(random.choice(self.population))
 
         # rest of population cnt will be replinished at crossover
@@ -297,18 +299,29 @@ class Evolvable:
 
         assert(self.state is EvolState.READY)
 
-        self.init_population()
+        try:
 
-        for ep in range(self.epoch_cnt):
+            self.init_population()
 
-            print(f"[i] ================== Generation {ep} ==================")
-            
-            self.selection()
-            self.mutate()
-            self.crossover()
-            self.refill()
+            for ep in range(self.epoch_cnt):
 
-        self.fitness()
+                assert(len(self.population) == self.population_cnt)
+
+                print(f"[i] ================== Generation {ep} ==================")
+                
+                self.selection()
+                self.mutate()
+                self.crossover()
+                self.refill()
+
+            self.fitness()
+
+        except Exception as err:
+
+            print(f"[!] exception when evolving: {err}")
+
+            with open(f"BACKUP_CHROMOSOMES_{time.time()}.txt", "w+") as backup:
+                print(self.population, file=backup, flush=True)
         
     def mutate(self):
         """perform mutation on all self.population\n
