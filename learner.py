@@ -364,7 +364,7 @@ class HumanVsRnd:
                             bestscore_f.write(int.to_bytes(current_score, 8, 'little'))
                             bestscore_f.write(save_model_name.encode())
 
-                        model.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
+                        self.save_model_(f"{MODEL_PATH_PREFFIX}{save_model_name}")
 
                 else:
 

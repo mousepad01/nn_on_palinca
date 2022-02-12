@@ -184,6 +184,14 @@ class Evolvable:
     def build_nn(self, chromosome):
         """chromosome -> model function"""
 
+        def _decode_c_gene(gene):
+            return max(16, (gene & Evolvable.C_FILTER_MASK) >> 1), \
+                    ((gene & Evolvable.C_KER_SIZE_MASK) >> 9) + 2
+
+        def _decode_d_gene(gene):
+            return max(16, (gene & Evolvable.D_UNIT_MASK) >> 1), \
+                ((gene & Evolvable.D_DROPOUT_MASK) >> 9) * 0.1
+
         model = Sequential()
         """obs: the layers will be considered in the following order:
                 * the first (LSB) 11 bits will represent layer 1 conv/res
@@ -194,13 +202,12 @@ class Evolvable:
 
         for _ in range(self.nc):
             
-            gene = chromosome & Evolvable.LAYER_MASK
+            gene = chromosome & Evolvable.C_LAYER_MASK
             chromosome >>= Evolvable.BITS_PER_C_LAYER
 
             if gene & Evolvable.C_ACTIVE_MASK:
 
-                filter_cnt = max(16, gene & Evolvable.C_FILTER_MASK)
-                ker_size = gene & Evolvable.C_KER_SIZE_MASK + 2
+                filter_cnt, ker_size = _decode_c_gene(gene)
                 
                 if self.use_res:
                     model.add(Res1D(filters=filter_cnt, kernel_size=ker_size))
@@ -214,13 +221,12 @@ class Evolvable:
 
         for _ in range(self.nd):
             
-            gene = chromosome & Evolvable.LAYER_MASK
+            gene = chromosome & Evolvable.D_LAYER_MASK
             chromosome >>= Evolvable.BITS_PER_D_LAYER
 
             if gene & Evolvable.D_ACTIVE_MASK:
 
-                unit_cnt = max(16, gene & Evolvable.D_UNIT_MASK)
-                dropout = (gene & Evolvable.D_DROPOUT_MASK) * 0.1
+                unit_cnt, dropout = _decode_d_gene(gene)
                 
                 model.add(Dense(unit_cnt))
                 model.add(ReLU())
@@ -236,10 +242,6 @@ class Evolvable:
     def fitness(self):
         """perform fitness function evaluation
             on all self.population which have associated score == 'None'"""
-
-        optimizer = SGD(1e-4, 0.9),
-        loss = CategoricalCrossentropy(), 
-        metrics = ['accuracy']
         
         for idx in range(self.population_cnt):
 
@@ -249,10 +251,9 @@ class Evolvable:
             nn = self.build_nn(self.population[idx][0])
 
             self.learner.model = nn
-            self.learner.model.compile(optimizer = optimizer, 
-                                        loss = loss, 
-                                        metrics = metrics)
-            self.learner.init_model()
+            self.learner.model.compile(optimizer = SGD(1e-4, 0.9), 
+                                        loss = CategoricalCrossentropy(), 
+                                        metrics = ['accuracy'])
 
             self.learner.model_state = ModelState.UNTRAINED
             self.learner.train_model(save_model_name=None)
@@ -269,6 +270,8 @@ class Evolvable:
         
         self.fitness()
         self.population.sort(key = lambda x: x[1])
+
+        print(f"[*] best from current population: {self.population[-1][1]}")
 
         self._elites = deepcopy(self.population[-2:])
 
@@ -296,9 +299,9 @@ class Evolvable:
             self.crossover()
             self.refill()
 
-        self.fitness()
         # TODO return / save the best config
-
+        self.fitness()
+        
     def mutate(self):
         """perform mutation on all self.population\n
             in an attempt to make mutation faster,
