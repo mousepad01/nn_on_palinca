@@ -1,5 +1,6 @@
 import random
 from enum import Enum
+from copy import deepcopy
 
 import tensorflow as tf
 import numpy as np
@@ -71,28 +72,34 @@ class Evolvable:
     """
 
     BITS_PER_C_LAYER = 11
-
-    C_LAYER_MASK = (2 ** BITS_PER_C_LAYER) - 1
+    C_LAYER_MASK = (1 << BITS_PER_C_LAYER) - 1
 
     C_ACTIVE_MASK = 1
-    C_FILTER_MASK = ((2 ** 9) - 1) & ~C_ACTIVE_MASK
-    C_KER_SIZE_MASK = (((2 ** 11) - 1) & ~C_FILTER_MASK) & ~C_ACTIVE_MASK
+    C_FILTER_MASK = ((1 << 9) - 1) & ~C_ACTIVE_MASK
+    C_KER_SIZE_MASK = (((1 << 11) - 1) & ~C_FILTER_MASK) & ~C_ACTIVE_MASK
 
     BITS_PER_D_LAYER = 11
-
-    D_LAYER_MASK = (2 ** BITS_PER_D_LAYER) - 1
+    D_LAYER_MASK = (1 << BITS_PER_D_LAYER) - 1
 
     D_ACTIVE_MASK = 1
-    D_UNIT_MASK = ((2 ** 9) - 1) & ~D_ACTIVE_MASK
-    D_DROPOUT_MASK = (((2 ** 11) - 1) & ~D_UNIT_MASK) & ~D_ACTIVE_MASK
+    D_UNIT_MASK = ((1 << 9) - 1) & ~D_ACTIVE_MASK
+    D_DROPOUT_MASK = (((1 << 11) - 1) & ~D_UNIT_MASK) & ~D_ACTIVE_MASK
 
     def __init__(self, nc=6, 
                         nd=6,
                         use_res=True,
+
                         epoch_cnt=20,
-                        population_cnt=10,
+                        population_cnt=20,
+
                         elite_cnt=2,
                         selection_luck=0.1,
+
+                        mutation_log_p=4,
+                        mutation_p_is_complement=False,
+
+                        crossover_p = 0.7,
+                        crossover_point_cnt = 3,
                         ):
 
         self.nc = nc
@@ -113,7 +120,8 @@ class Evolvable:
         self.population = []
         """list of (individual, score == fitness(individual))"""
 
-        self.max_chrom_value = 2 ** (Evolvable.BITS_PER_C_LAYER * self.nc + Evolvable.BITS_PER_D_LAYER * self.nd)
+        self.bits_pe_chrom = Evolvable.BITS_PER_C_LAYER * self.nc + Evolvable.BITS_PER_D_LAYER * self.nd
+        self.max_chrom_value = 1 << self.bits_pe_chrom
         """chromosome with all bits set to 1"""
 
         self.state = EvolState.UNINITIALIZED
@@ -121,12 +129,34 @@ class Evolvable:
         """associated model from learner.py"""
 
         self.elite_cnt = elite_cnt
-        """first elite_cnt individuals have a copy that bypasses mutation and recombination"""
+        """first elite_cnt individuals have a copy that bypasses mutation and crossover"""
 
         self.selection_luck = selection_luck
         """randomly select a percentage 
             of the self.population_cnt to go to the next generation,
             without any regards to fitness score"""
+
+        self.mutation_p_is_complement = mutation_p_is_complement
+        self.mutation_log_p = mutation_log_p
+        """if mutation_p_is_complement: 
+                mutation probability for an arbitrary bit = 1 - (1 / 1 << mutation_log_p)
+            else:
+                mutation probability for an arbitrary bit = 1 / 1 << mutation_log_p
+                """
+
+        self.crossover_p = crossover_p
+        """crossover probability for a chromosome"""
+
+        self.crossover_point_cnt = crossover_point_cnt
+        """number of crossover points"""
+
+        """ONLY FOR INTERNAL USE"""
+
+        self._elites = []
+        """field to store (temporary) elite individuals"""
+
+        self._selection_luck = int(self.population_cnt * self.selection_luck)
+        """selection luck value"""
 
     def init_learner(self, seed=None, **kwargs):
         
@@ -237,17 +267,15 @@ class Evolvable:
         self.fitness()
         self.population.sort(key = lambda x: x[1])
 
-        elites = self.population[-2:]
+        self._elites = deepcopy(self.population[-2:])
 
         new_population = self.population[self.population_cnt // 3:]
         
-        for _ in range(int(self.population_cnt * self.selection_luck)):
+        for _ in range(self._selection_luck):
             new_population.append(random.choice(self.population))
 
-        # rest of population cnt will be replinished at recombination
+        # rest of population cnt will be replinished at crossover
         self.population = new_population
-
-        return elites
 
     def evolve(self):
         """Start the evolution process"""
@@ -268,9 +296,70 @@ class Evolvable:
         # TODO return / save the best config
 
     def mutate(self):
-        """perform mutation on all self.population"""
-        pass
+        """perform mutation on all self.population\n
+            in an attempt to make mutation faster,
+            mutation is split in two phases:
 
-    def recombination(self):
-        """perform recombination on all self.population"""
-        pass
+            * mutation of some 0 bits to 1: 
+                generate (mutation_log_p + 1) random chromosomes
+                'and' them together, 'or' the chromosome with the result
+                
+            * mutation of some 1 bits to 0: 
+                generate (mutation_log_p + 1) random chromosomes
+                'and' them together, 'and not' the chromosome with the result"""
+
+        for idx in range(len(self.population)):
+
+            mask_0to1 = random.randint(0, self.max_chrom_value)
+            mask_1to0 = random.randint(0, self.max_chrom_value)
+
+            for _ in range(self.mutation_log_p + 1):
+
+                mask_0to1 &= random.randint(0, self.max_chrom_value)
+                mask_1to0 &= random.randint(0, self.max_chrom_value)
+
+            if self.mutation_p_is_complement:
+
+                mask_0to1 = ~mask_0to1
+                mask_1to0 = ~mask_1to0
+
+            self.population[idx][0] |= mask_0to1
+            self.population[idx][0] &= ~mask_1to0
+
+            # self.population[idx][1] (i.e. the score) does not need to be updated
+
+    def crossover(self):
+        """perform crossover on all self.population
+            for selecting """
+
+        for idx in range(len(self.population)):
+
+            waiting_crossover = None
+
+            do_crossover = True if random.random() < self.crossover_p else False
+            if do_crossover:
+
+                if waiting_crossover is None:
+                    waiting_crossover = idx
+
+                else:
+
+                    fst = self.population[idx][0]
+                    snd = self.population[waiting_crossover][0]
+
+                    for _ in range(self.crossover_point_cnt):
+
+                        point = random.randint(1, self.bits_pe_chrom - 1)
+                        mask = (1 << point) - 1
+
+                        tmp = fst
+
+                        fst = (mask & fst) | (~mask & snd)
+                        snd = (~mask & tmp) | (mask & snd)
+                    
+                    self.population[idx][0] = fst
+                    self.population[waiting_crossover][0] = snd
+
+                    # self.population[idx][1] (i.e. the score) does not need to be updated
+
+                    waiting_crossover = None
