@@ -34,6 +34,10 @@ class Evolvable:
     * epochs_cnt - number of selection steps to perform
     * population_cnt - number of chromosomes
 
+    Chromosome interpretation:
+
+    * [gene for training metadata (lr, momentum, batch_size)]
+
     * [gene for conv/res layer 1]
     * batch normalization
     * relu
@@ -56,21 +60,33 @@ class Evolvable:
     * dense layer, 2 neurons
     * softmax
 
-    gene for conv/res layer (66 bits):
     (all fields are considered unsigned integers)
     (LSB -> MSB)
+
+    gene for metadata (6 bits):
+    bit 0-2: raw learning rate (learning rate = 10 ** -(raw learning rate + 2))
+    bit 2-4: raw momentum (momentum = 0.6 + 0.1 * raw momentum)
+    bit 4-6: raw batch size (batch size = 2 ** (raw batch size + 4))
+
+    gene for conv/res layer (11 bits):
 
     bit 0:      active / not active
     bit 1-9:    raw filter count (filter count = max(16, raw filter count))
     bit 9-11:   raw kernel size (kernel size = 2 + raw kernel size)
 
-    gene for dense layer (66 bits):
-    (all fields are considered unsigned integers)
+    gene for dense layer (11 bits):
 
     bit 0:      active / not active
     bit 1-9:    raw units count (units count = max(16, raw units count))
     bit 9-11:   raw dropout (dropout = raw dropout * 0.1)
     """
+
+    BITS_PER_METADATA_LAYER = 6
+    METADATA_LAYER_MASK = (1 << BITS_PER_METADATA_LAYER) - 1
+
+    LR_MASK = (1 << 2) - 1
+    MOMENTUM_MASK = ((1 << 4) - 1) & ~LR_MASK
+    BATCH_SIZE_MASK = (((1 << 6) - 1) & ~MOMENTUM_MASK) & ~LR_MASK
 
     BITS_PER_C_LAYER = 11
     C_LAYER_MASK = (1 << BITS_PER_C_LAYER) - 1
@@ -91,7 +107,7 @@ class Evolvable:
                         use_res=True,
 
                         epoch_cnt=20,
-                        population_cnt=2,
+                        population_cnt=16,
 
                         elite_cnt=2,
                         selection_luck=0.1,
@@ -121,7 +137,10 @@ class Evolvable:
         self.population = []
         """list of (individual, score == fitness(individual))"""
 
-        self.bits_pe_chrom = Evolvable.BITS_PER_C_LAYER * self.nc + Evolvable.BITS_PER_D_LAYER * self.nd
+        self.bits_pe_chrom = Evolvable.BITS_PER_C_LAYER * self.nc + \
+                                Evolvable.BITS_PER_D_LAYER * self.nd + \
+                                Evolvable.BITS_PER_METADATA_LAYER * 1
+
         self.max_chrom_value = 1 << self.bits_pe_chrom
         """chromosome with all bits set to 1"""
 
@@ -243,6 +262,11 @@ class Evolvable:
     def fitness(self):
         """perform fitness function evaluation
             on all self.population which have associated score == 'None'"""
+
+        def _decode_metadata_gene(gene):
+            return 10 ** -((gene & Evolvable.LR_MASK) + 2), \
+                    0.6 + 0.1 * ((gene & Evolvable.MOMENTUM_MASK) >> 2), \
+                    1 << (4 + ((gene & Evolvable.BATCH_SIZE_MASK) >> 4))
         
         for idx in range(self.population_cnt):
 
@@ -251,22 +275,25 @@ class Evolvable:
 
             try:
 
+                lr, momentum, batch_size = _decode_metadata_gene(self.population[idx][0])
+
                 nn = self.build_nn(self.population[idx][0])
 
                 self.learner.model = nn
-                self.learner.model.compile(optimizer = SGD(1e-4, 0.9), 
+                self.learner.model.compile(optimizer = SGD(lr, momentum), 
                                             loss = CategoricalCrossentropy(), 
                                             metrics = ['accuracy'])
 
                 self.learner.model_state = ModelState.UNTRAINED
                 self.learner.train_model(save_model_name=None, display_history=False,
-                                            epochs=2)
+                                            epochs=self.train_epoch_cnt,
+                                            batch_size=batch_size)
 
                 validation_results = self.learner.validate(save_model_name = "evolved_best_model")
                 self.population[idx][1] = validation_results["accuracy"]
 
             except Exception as err:
-                print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!error {err}")
+                print(f"error while training or validating model: {err}")
                 self.population[idx][1] = 0.0
 
     def selection(self):
@@ -294,8 +321,10 @@ class Evolvable:
         # rest of population cnt will be replinished at crossover
         self.population = new_population
 
-    def evolve(self):
+    def evolve(self, train_epoch_cnt = 9):
         """Start the evolution process"""
+
+        self.train_epoch_cnt = train_epoch_cnt
 
         assert(self.state is EvolState.READY)
 
