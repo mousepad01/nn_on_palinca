@@ -64,6 +64,7 @@ class Evolvable:
     (LSB -> MSB)
 
     gene for metadata (6 bits):
+
     bit 0-2: raw learning rate (learning rate = 10 ** -(raw learning rate + 2))
     bit 2-4: raw momentum (momentum = 0.6 + 0.1 * raw momentum)
     bit 4-6: raw batch size (batch size = 2 ** (raw batch size + 4))
@@ -106,7 +107,7 @@ class Evolvable:
                         nd=6,
                         use_res=True,
 
-                        epoch_cnt=20,
+                        epoch_cnt=30,
                         population_cnt=16,
 
                         elite_cnt=2,
@@ -118,6 +119,14 @@ class Evolvable:
                         crossover_p = 0.7,
                         crossover_point_cnt = 3,
                         ):
+        """(Most of documentation is inside init)\n
+            Some observations:
+            * mutation_log_p can be an int or a dict {epoch_idx: value}
+            * crossover_p can be an int or a dict {epoch_idx: value}
+            * selection_luck can be an int or a dict {epoch_idx: value}"""
+
+        def _todict(x):
+            return {e: x for e in range(epoch_cnt)} if type(x) is int else x
 
         self.nc = nc
         """maximum number of Conv1D / Res1D layers"""
@@ -151,20 +160,20 @@ class Evolvable:
         self.elite_cnt = elite_cnt
         """first elite_cnt individuals have a copy that bypasses mutation and crossover"""
 
-        self.selection_luck = selection_luck
+        self.selection_luck = _todict(selection_luck)
         """randomly select a percentage 
             of the self.population_cnt to go to the next generation,
             without any regards to fitness score"""
 
         self.mutation_p_is_complement = mutation_p_is_complement
-        self.mutation_log_p = mutation_log_p
+        self.mutation_log_p = _todict(mutation_log_p)
         """if mutation_p_is_complement: 
                 mutation probability for an arbitrary bit = 1 - (1 / 1 << mutation_log_p)
             else:
                 mutation probability for an arbitrary bit = 1 / 1 << mutation_log_p
                 """
 
-        self.crossover_p = crossover_p
+        self.crossover_p = _todict(crossover_p)
         """crossover probability for a chromosome"""
 
         self.crossover_point_cnt = crossover_point_cnt
@@ -174,9 +183,6 @@ class Evolvable:
 
         self._elites = []
         """field to store (temporary) elite individuals"""
-
-        self._selection_luck = int(self.population_cnt * self.selection_luck)
-        """selection luck value"""
 
     def init_learner(self, seed=None, **kwargs):
         
@@ -296,7 +302,7 @@ class Evolvable:
                 print(f"error while training or validating model: {err}")
                 self.population[idx][1] = 0.0
 
-    def selection(self):
+    def selection(self, epoch):
         """perform selection on self.population
         heuristic:
         * elitism applied on the first self.elite_cnt inidividuals
@@ -313,7 +319,8 @@ class Evolvable:
 
         new_population = self.population[self.population_cnt * 2 // 3:]
 
-        lucky_cnt = min(self._selection_luck, self.population_cnt - len(self.population))
+        lucky_cnt = min(int(self.population_cnt * self.selection_luck[epoch]), 
+                            self.population_cnt - len(self.population))
         
         for _ in range(lucky_cnt):
             new_population.append(random.choice(self.population))
@@ -352,7 +359,7 @@ class Evolvable:
             with open(f"BACKUP_CHROMOSOMES_{time.time()}.txt", "w+") as backup:
                 print(self.population, file=backup, flush=True)
         
-    def mutate(self):
+    def mutate(self, epoch):
         """perform mutation on all self.population\n
             in an attempt to make mutation faster,
             mutation is split in two phases:
@@ -370,7 +377,7 @@ class Evolvable:
             mask_0to1 = random.randint(0, self.max_chrom_value)
             mask_1to0 = random.randint(0, self.max_chrom_value)
 
-            for _ in range(self.mutation_log_p + 1):
+            for _ in range(self.mutation_log_p[epoch] + 1):
 
                 mask_0to1 &= random.randint(0, self.max_chrom_value)
                 mask_1to0 &= random.randint(0, self.max_chrom_value)
@@ -385,14 +392,14 @@ class Evolvable:
 
             self.population[idx][1] = None
 
-    def crossover(self):
+    def crossover(self, epoch):
         """perform crossover on all self.population"""
 
         for idx in range(len(self.population)):
 
             waiting_crossover = None
 
-            do_crossover = True if random.random() < self.crossover_p else False
+            do_crossover = True if random.random() < self.crossover_p[epoch] else False
             if do_crossover:
 
                 if waiting_crossover is None:
@@ -421,7 +428,7 @@ class Evolvable:
 
                     waiting_crossover = None
 
-    def refill(self):
+    def refill(self, epoch):
         """method that re-integrates elites
             and refills self.population with random new chromosomes"""
 
