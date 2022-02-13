@@ -289,7 +289,7 @@ class HumanVsRnd:
 
         assert(self.model_state is ModelState.UNINITIALIZED)
 
-        self.model = load_model(model_path)
+        self.model = load_model(model_path, custom_objects={"Res1D": Res1D})
         self.model_state = ModelState.TRAINED
 
     def save_model_(self, model_path):

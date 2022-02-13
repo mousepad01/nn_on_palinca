@@ -112,7 +112,7 @@ class Evolvable:
                         elite_cnt=2,
                         selection_luck=0.1,
 
-                        mutation_log_p=4,
+                        mutation_log_p=3,
                         mutation_p_is_complement=False,
 
                         crossover_p = 0.7,
