@@ -16,6 +16,8 @@ from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
 from tensorflow.keras.callbacks import History
 
+# TODO make mutation is complement attribute also variable
+
 class EvolState(Enum):
 
     UNINITIALIZED = "uninitialized"
@@ -345,10 +347,10 @@ class Evolvable:
 
                 print(f"[i] ================== Generation {ep} ==================")
                 
-                self.selection()
-                self.mutate()
-                self.crossover()
-                self.refill()
+                self.selection(ep)
+                self.mutate(ep)
+                self.crossover(ep)
+                self.refill(ep)
 
             self.fitness()
 
