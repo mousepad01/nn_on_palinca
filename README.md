@@ -12,6 +12,6 @@ and real keystroke timestamp sequences
 Quick update: with a relatively basic model of up to 8 residual layers with 1d convolutions,
               and about as many dense layers, the accuracy goes up to ~95% 
               on the binary classification: human data vs random
-              short documentation will be posted soon
+              (short documentation will be posted soon)
 
 (Linux only)
