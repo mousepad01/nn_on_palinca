@@ -14,7 +14,6 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
-from tensorflow.keras.callbacks import History
 
 MODEL_PATH_PREFFIX = "./model_data/"
 
@@ -30,21 +29,28 @@ class ModelState(Enum):
     UNTRAINED = "untrained"
     TRAINED = "trained"
 
-class HumanVsRnd:
+class KeystrokeFingerprintClassificator:
     """Its task is to differentiate
-        between human keystroke timestamps
-        and random keystroke timestamps"""
+        between different humans' keystroke timestamps
+        and also random keystroke timestamps
 
-    def __init__(self, data_path = "timestamps.bin",
+        NOTE: if you want to also include random data,
+                set versus_random to True
+                (if versus_random is false, other random params will be ignored)"""
+
+    def __init__(self, data_paths = ["timestamps.bin"],
                         new_timeslice_thresh = 4,
                         micros_to_ms = 1000,
                         timeslice_len = 15,
+
+                        versus_random = True,
                         random_to_human_ratio = 1.5,
                         random_min_decal = 80,
                         random_max_decal = 300,
                         validation_ratio = 0.2,
                         ):
 
+        assert(len(data_paths) >= 1)
         assert(1 <= micros_to_ms <= 1000000)
         assert(new_timeslice_thresh > 0)
         assert(timeslice_len > 0)
@@ -53,30 +59,34 @@ class HumanVsRnd:
         assert(random_max_decal < new_timeslice_thresh * micros_to_ms)
         assert(0 < validation_ratio < 1)
 
+        self.versus_random = versus_random
+        """whether to include random as a class, or classify only
+            humans vs humans"""
+
         self.timeslice_len = timeslice_len
         """timeslice length to be fed to the ML model"""
 
         self.micros_to_ms = micros_to_ms
         """conversion between microseconds (raw_data[idx][1]) to 'miliseconds'"""
 
-        self.data_path = data_path
+        self.data_paths = data_paths
         self.new_timeslice_thresh = new_timeslice_thresh
         """threshold (in seconds) that forces a new timeslice"""
 
         self.data_state = DataState.UNINITIALIZED
-        self.data = None
+        self.data = {} # {class: [data...]}
         """human train data"""
 
         self.random_data_state = DataState.UNINITIALIZED
-        self.random_data = None
+        self.random_data = [] # [data...]
         """random train data"""
 
         self.v_data_state = DataState.UNINITIALIZED
-        self.v_data = None
+        self.v_data = {} # {class: [data...]}
         """human validation data"""
 
         self.v_random_data_state = DataState.UNINITIALIZED
-        self.v_random_data = None
+        self.v_random_data = [] # [data...]
         """random validation data"""
 
         self.random_min_decal = random_min_decal
@@ -94,32 +104,41 @@ class HumanVsRnd:
         self.model = None
         """model"""
 
+        """ONLY FOR INTERNAL USE"""
+        self._dataname_to_class = {data_paths[idx]: idx for idx in len(data_paths)}
+        self._class_to_dataname = {idx: data_paths[idx] for idx in len(data_paths)}
+        # currently redundant, but to make sure no bugs appear due to list operations
+
     # data
 
     def load_data(self):
 
-        data_buf = []
+        data_bufs = {}
 
-        with open(self.data_path, "rb") as data:
-            alldata = data.read()
+        for data_path, class_ in self._dataname_to_class:
 
-        last_s, last_ms = 0, 0
+            data_bufs[class_] = []
 
-        idx = 0
-        while idx < len(alldata):
+            with open(data_path, "rb") as data:
+                alldata = data.read()
 
-            s = int.from_bytes(alldata[idx: idx + 8], 'little')
-            ms = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
+            last_s, last_ms = 0, 0
 
-            assert((s, ms) > (last_s, last_ms))
+            idx = 0
+            while idx < len(alldata):
 
-            data_buf.append((s, ms))
+                s = int.from_bytes(alldata[idx: idx + 8], 'little')
+                ms = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
 
-            # print(f"{idx // 16}: {s}, {ms}")
+                assert((s, ms) > (last_s, last_ms))
 
-            idx += 16
+                data_bufs[class_].append((s, ms))
 
-        self.data = data_buf
+                # print(f"{idx // 16}: {s}, {ms}")
+
+                idx += 16
+
+        self.data = data_bufs
         self.data_state = DataState.RAW
 
     def format_data(self):
@@ -413,11 +432,13 @@ class HumanVsRnd:
 
 if __name__ == "__main__":
 
-    model = HumanVsRnd(data_path = "./timestamps.bin")
+    model = KeystrokeFingerprintClassificator(data_paths = ["timestamps_calin.bin",
+                                                            "timestamps_jon.bin"],
+                                                versus_random = True)
     model.seed(123)
 
     model.prep_data()
 
     model.init_model()
     model.train_model()
-    model.validate(save_model_name = "bestmodel")
+    model.validate(save_model_name = "bestmodel_multiclassif")

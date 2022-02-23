@@ -14,7 +14,6 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
-from tensorflow.keras.callbacks import History
 
 # TODO make mutation is complement attribute also variable
 
