@@ -29,6 +29,7 @@ class ModelState(Enum):
     UNTRAINED = "untrained"
     TRAINED = "trained"
 
+# chicken anyone?
 class KeystrokeFingerprintClassificator:
     """Its task is to differentiate
         between different humans' keystroke timestamps
@@ -108,8 +109,8 @@ class KeystrokeFingerprintClassificator:
         """model"""
 
         """ONLY FOR INTERNAL USE"""
-        self._dataname_to_class = {data_paths[idx]: idx for idx in len(data_paths)}
-        self._class_to_dataname = {idx: data_paths[idx] for idx in len(data_paths)}
+        self._dataname_to_class = {data_paths[idx]: idx for idx in range(len(data_paths))}
+        self._class_to_dataname = {idx: data_paths[idx] for idx in range(len(data_paths))}
         # currently redundant, but to make sure no bugs appear due to list operations
         # NOTE: if changing this mapping, REWORK RANDOM DATA CLASSIFICATION LABELS !!!
 
@@ -119,7 +120,7 @@ class KeystrokeFingerprintClassificator:
 
         data_bufs = {}
 
-        for data_path, class_ in self._dataname_to_class:
+        for data_path, class_ in self._dataname_to_class.items():
 
             data_bufs.update({class_: []})
             
@@ -149,7 +150,7 @@ class KeystrokeFingerprintClassificator:
         """* make timestamps relative to one another
             * split in different timeslices"""
 
-        for class_, raw_data in self.data:
+        for class_, raw_data in self.data.items():
 
             data_timeslices = []
 
@@ -212,7 +213,7 @@ class KeystrokeFingerprintClassificator:
         assert(self.data_state is DataState.READY)
         
         total_human_data = 0
-        for _, d in self.data.values():
+        for _, d in self.data.items():
             total_human_data += d.shape[0]
 
         random_data_len = int(self.random_to_human_ratio * total_human_data)
@@ -233,8 +234,11 @@ class KeystrokeFingerprintClassificator:
         self.random_data = np.array(self.random_data, dtype = np.float32)
         self.random_data_state = DataState.READY
 
+        #TODO calibrate ratio between 
+        #       random validation data and other human data ???
+
         self.v_random_data = []
-        for _ in range(self.v_data.shape[0]):
+        for _ in range(int(random_data_len * self.validation_ratio)):
             
             self.v_random_data.append([])
             self.t_offset = 0
@@ -294,7 +298,7 @@ class KeystrokeFingerprintClassificator:
             Dense(16),
             ReLU(),
 
-            Dense(self.human_cnt),
+            Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
             Softmax()
         ])
 
@@ -343,7 +347,7 @@ class KeystrokeFingerprintClassificator:
         train_data = []
         train_data_labels = []
 
-        for class_, d in self.data.values():
+        for class_, d in self.data.items():
 
             train_data.append(d)
             train_data_labels.append(np.full((d.shape[0],), fill_value = class_))
@@ -390,7 +394,7 @@ class KeystrokeFingerprintClassificator:
         validation_data = []
         validation_data_labels = []
 
-        for class_, d in self.data.values():
+        for class_, d in self.data.items():
 
             validation_data.append(d)
             validation_data_labels.append(np.full((d.shape[0],), fill_value = class_))
