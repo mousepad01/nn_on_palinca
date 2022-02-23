@@ -117,8 +117,8 @@ class KeystrokeFingerprintClassificator:
 
         for data_path, class_ in self._dataname_to_class:
 
-            data_bufs[class_] = []
-
+            data_bufs.update({class_: []})
+            
             with open(data_path, "rb") as data:
                 alldata = data.read()
 
@@ -145,61 +145,61 @@ class KeystrokeFingerprintClassificator:
         """* make timestamps relative to one another
             * split in different timeslices"""
 
-        raw_data = self.data
+        for class_, raw_data in self.data:
 
-        data_timeslices = []
+            data_timeslices = []
 
-        last_t = 0
+            last_t = 0
 
-        current_timeslice_base_s = 0
-        current_timeslice_base_ms = 0
-        current_timeslice_len = 0
-        
-        idx = 0
-        timeslice_idx = -1
+            current_timeslice_base_s = 0
+            current_timeslice_base_ms = 0
+            current_timeslice_len = 0
+            
+            idx = 0
+            timeslice_idx = -1
 
-        while idx < len(raw_data):
+            while idx < len(raw_data):
 
-            if current_timeslice_len == self.timeslice_len + 1 or \
-                raw_data[idx][0] - last_t > self.new_timeslice_thresh:
-                
-                timeslice_idx += 1
-                data_timeslices.append([])
+                if current_timeslice_len == self.timeslice_len + 1 or \
+                    raw_data[idx][0] - last_t > self.new_timeslice_thresh:
+                    
+                    timeslice_idx += 1
+                    data_timeslices.append([])
 
-                current_timeslice_base_s = raw_data[idx][0]
-                current_timeslice_base_ms = raw_data[idx][1] // self.micros_to_ms
-                current_timeslice_len = 0
+                    current_timeslice_base_s = raw_data[idx][0]
+                    current_timeslice_base_ms = raw_data[idx][1] // self.micros_to_ms
+                    current_timeslice_len = 0
 
-            data_timeslices[-1].append([(raw_data[idx][0] - current_timeslice_base_s) * self.micros_to_ms + 
-                                    raw_data[idx][1] // self.micros_to_ms - current_timeslice_base_ms])
+                data_timeslices[-1].append([(raw_data[idx][0] - current_timeslice_base_s) * self.micros_to_ms + 
+                                        raw_data[idx][1] // self.micros_to_ms - current_timeslice_base_ms])
 
-            assert(data_timeslices[-1][-1][0] >= 0)
+                assert(data_timeslices[-1][-1][0] >= 0)
 
-            current_timeslice_len += 1
-            last_t = raw_data[idx][0]
-            idx += 1
+                current_timeslice_len += 1
+                last_t = raw_data[idx][0]
+                idx += 1
 
-        self.data = []
-        for tslice in data_timeslices:
+            self.data[class_] = []
+            for tslice in data_timeslices:
 
-            assert(len(tslice) <= self.timeslice_len + 1)
+                assert(len(tslice) <= self.timeslice_len + 1)
 
-            if len(tslice) == self.timeslice_len + 1:
-                self.data.append(tslice[1:])    # first entry always 0, also add a 'dummy' dimension
+                if len(tslice) == self.timeslice_len + 1:
+                    self.data[class_].append(tslice[1:])    # first entry always 0, also add a 'dummy' dimension
 
-        v_data_len = int(self.validation_ratio * len(self.data))
-        splitpoint = random.randint(0, len(self.data) - v_data_len)
+            v_data_len = int(self.validation_ratio * len(self.data[class_]))
+            splitpoint = random.randint(0, len(self.data[class_]) - v_data_len)
 
-        self.v_data = self.data[splitpoint: splitpoint + v_data_len]
-        self.data = self.data[:splitpoint] + self.data[splitpoint + v_data_len:]
+            self.v_data.update({class_: self.data[class_][splitpoint: splitpoint + v_data_len]})
+            self.data[class_] = self.data[class_][:splitpoint] + self.data[class_][splitpoint + v_data_len:]
 
-        print(f"[i] Data (train, human) timeslice count: {len(self.data)}")
-        print(f"[i] Data (validate, human) timeslice count: {len(self.v_data)}")
+            print(f"[i] Data (train, human {class_}) timeslice count: {len(self.data[class_])}")
+            print(f"[i] Data (validate, human {class_}) timeslice count: {len(self.v_data[class_])}")
 
-        self.data = np.array(self.data, dtype = np.float32)
+            self.data[class_] = np.array(self.data[class_], dtype = np.float32)
+            self.v_data[class_] = np.array(self.v_data[class_], dtype = np.float32)
+
         self.data_state = DataState.READY
-
-        self.v_data = np.array(self.v_data, dtype = np.float32)
         self.v_data_state = DataState.READY
 
     def random_data_gen(self):
