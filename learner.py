@@ -15,7 +15,7 @@ from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
 
-MODEL_PATH_PREFFIX = "./model_data/"
+MODEL_PATH_PREFFIX = "./model_data_multi/"
 
 class DataState(Enum):
     
@@ -58,6 +58,9 @@ class KeystrokeFingerprintClassificator:
         assert(random_min_decal > 0)
         assert(random_max_decal < new_timeslice_thresh * micros_to_ms)
         assert(0 < validation_ratio < 1)
+
+        self.human_cnt = len(data_paths)
+        """number of classes (-1 if versus_random is true)"""
 
         self.versus_random = versus_random
         """whether to include random as a class, or classify only
@@ -108,6 +111,7 @@ class KeystrokeFingerprintClassificator:
         self._dataname_to_class = {data_paths[idx]: idx for idx in len(data_paths)}
         self._class_to_dataname = {idx: data_paths[idx] for idx in len(data_paths)}
         # currently redundant, but to make sure no bugs appear due to list operations
+        # NOTE: if changing this mapping, REWORK RANDOM DATA CLASSIFICATION LABELS !!!
 
     # data
 
@@ -290,7 +294,7 @@ class KeystrokeFingerprintClassificator:
             Dense(16),
             ReLU(),
 
-            Dense(2),
+            Dense(self.human_cnt),
             Softmax()
         ])
 
@@ -326,19 +330,39 @@ class KeystrokeFingerprintClassificator:
                             display_history = True):
 
         assert(self.data_state is DataState.READY)
-        assert(self.random_data_state is DataState.READY)
+
+        if self.versus_random:
+            assert(self.random_data_state is DataState.READY)
 
         assert(self.model_state in [ModelState.UNTRAINED, ModelState.TRAINED])
 
-        train_data = tf.concat([self.data, self.random_data], axis = 0)
+        '''train_data = tf.concat([self.data, self.random_data], axis = 0)
         train_data_labels = tf.concat([np.ones((self.data.shape[0],)), np.zeros((self.random_data.shape[0],))], axis = 0)
-        train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 2)
+        train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 2)'''
+
+        train_data = []
+        train_data_labels = []
+
+        for class_, d in self.data.values():
+
+            train_data.append(d)
+            train_data_labels.append(np.full((d.shape[0],), fill_value = class_))
+
+        if self.versus_random:
+            
+            train_data.append(self.random_data)
+            train_data_labels.append(np.full((self.random_data.shape[0],), fill_value = self.human_cnt))
+
+        train_data = tf.concat(train_data, axis = 0)
+        train_data_labels = tf.concat(train_data_labels, axis = 0)
+        train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 
+                                self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
         print(f"\n[i] training started\n")
 
         history = self.model.fit(x = train_data, y = train_data_labels,
-                        batch_size = batch_size,
-                        epochs = epochs)
+                                    batch_size = batch_size,
+                                    epochs = epochs)
 
         print(f"\n[i] training ended\n")
 
@@ -353,13 +377,33 @@ class KeystrokeFingerprintClassificator:
     def validate(self, save_model_name = None, save_if_best = True):
         
         assert(self.v_data_state is DataState.READY)
-        assert(self.v_random_data_state is DataState.READY)
+
+        if self.versus_random:
+            assert(self.v_random_data_state is DataState.READY)
 
         assert(self.model_state is ModelState.TRAINED)
 
-        validation_data = tf.concat([self.v_data, self.v_random_data], axis = 0)
+        '''validation_data = tf.concat([self.v_data, self.v_random_data], axis = 0)
         validation_data_labels = tf.concat([np.ones((self.v_data.shape[0],)), np.zeros((self.v_random_data.shape[0],))], axis = 0)
-        validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 2)
+        validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 2)'''
+
+        validation_data = []
+        validation_data_labels = []
+
+        for class_, d in self.data.values():
+
+            validation_data.append(d)
+            validation_data_labels.append(np.full((d.shape[0],), fill_value = class_))
+
+        if self.versus_random:
+            
+            validation_data.append(self.random_data)
+            validation_data_labels.append(np.full((self.random_data.shape[0],), fill_value = self.human_cnt))
+
+        validation_data = tf.concat(validation_data, axis = 0)
+        validation_data_labels = tf.concat(validation_data_labels, axis = 0)
+        validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 
+                                        self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
         print(f"\n[i] validation started\n")
 
