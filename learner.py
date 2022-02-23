@@ -203,11 +203,15 @@ class KeystrokeFingerprintClassificator:
         self.v_data_state = DataState.READY
 
     def random_data_gen(self):
-        """generate 'random' keystroke timestamps"""
+        """generate random keystroke timestamps"""
 
         assert(self.data_state is DataState.READY)
         
-        random_data_len = int(self.random_to_human_ratio * self.data.shape[0])
+        total_human_data = 0
+        for _, d in self.data.values():
+            total_human_data += d.shape[0]
+
+        random_data_len = int(self.random_to_human_ratio * total_human_data)
         self.random_data = []
 
         for _ in range(random_data_len):
@@ -245,7 +249,9 @@ class KeystrokeFingerprintClassificator:
 
         self.load_data()
         self.format_data()
-        self.random_data_gen()
+
+        if self.versus_random:
+            self.random_data_gen()
 
     # model
 
