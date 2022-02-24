@@ -142,6 +142,14 @@ class KeystrokeFingerprintClassificator:
                 # print(f"{idx // 16}: {s}, {ms}")
 
                 idx += 16
+                
+        min_data_len = 2 ** 100
+
+        for class_ in data_bufs.keys():
+            min_data_len = min(min_data_len, len(data_bufs[class_]))
+
+        for class_ in data_bufs.keys():
+            data_bufs[class_] = data_bufs[class_][:min_data_len]
 
         self.data = data_bufs
         self.data_state = DataState.RAW
