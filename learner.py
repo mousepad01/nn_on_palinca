@@ -491,16 +491,3 @@ class KeystrokeFingerprintClassificator:
 
         acc_loss_epoch.legend(loc = "upper left")
         plt.show()
-
-if __name__ == "__main__":
-
-    model = KeystrokeFingerprintClassificator(data_paths = ["timestamps_calin.bin",
-                                                            "timestamps_jon.bin"],
-                                                versus_random = True)
-    model.seed(123)
-
-    model.prep_data()
-
-    model.init_model()
-    model.train_model()
-    model.validate(save_model_name = "bestmodel_multiclassif")
