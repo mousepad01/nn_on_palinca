@@ -5,7 +5,7 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from learner import HumanVsRnd, KeystrokeFingerprintClassificator, ModelState
+from learner import KeystrokeFingerprintClassificator, ModelState
 
 from model import Res1D
 
@@ -155,7 +155,7 @@ class Evolvable:
         """chromosome with all bits set to 1"""
 
         self.state = EvolState.UNINITIALIZED
-        self.learner: HumanVsRnd = None
+        self.learner: KeystrokeFingerprintClassificator = None
         """associated model from learner.py"""
 
         self.elite_cnt = elite_cnt
