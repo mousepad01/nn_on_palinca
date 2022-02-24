@@ -5,7 +5,7 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from learner import HumanVsRnd, ModelState
+from learner import HumanVsRnd, KeystrokeFingerprintClassificator, ModelState
 
 from model import Res1D
 
@@ -187,7 +187,7 @@ class Evolvable:
 
     def init_learner(self, seed=None, **kwargs):
         
-        self.learner = HumanVsRnd(**kwargs)
+        self.learner = KeystrokeFingerprintClassificator(**kwargs)
 
         if seed is not None:
             self.learner.seed(seed)

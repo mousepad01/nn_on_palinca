@@ -52,6 +52,7 @@ class KeystrokeFingerprintClassificator:
                         ):
 
         assert(len(data_paths) >= 1)
+        assert(not(len(data_paths) == 1 and versus_random is False))
         assert(1 <= micros_to_ms <= 1000000)
         assert(new_timeslice_thresh > 0)
         assert(timeslice_len > 0)
