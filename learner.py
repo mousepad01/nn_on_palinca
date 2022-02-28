@@ -51,8 +51,16 @@ class KeystrokeFingerprintClassificator:
                         validation_ratio = 0.2,
                         ):
 
+        if type(data_paths) is str:
+            data_paths = [[data_paths]]
+
+        elif type(data_paths) is list:
+
+            if type(data_paths[0]) is str:
+                data_paths = [data_paths]
+
         assert(len(data_paths) >= 1)
-        assert(not(len(data_paths) == 1 and versus_random is False))
+        assert(not(len(data_paths) == 1 and len(data_paths[0]) == 1 and versus_random is False))
         assert(1 <= micros_to_ms <= 1000000)
         assert(new_timeslice_thresh > 0)
         assert(timeslice_len > 0)
@@ -110,7 +118,7 @@ class KeystrokeFingerprintClassificator:
         """model"""
 
         """ONLY FOR INTERNAL USE"""
-        self._dataname_to_class = {data_paths[idx]: idx for idx in range(len(data_paths))}
+        self._dataname_to_class = {tuple(data_paths[idx]): idx for idx in range(len(data_paths))}
         self._class_to_dataname = {idx: data_paths[idx] for idx in range(len(data_paths))}
         # currently redundant, but to make sure no bugs appear due to list operations
         # NOTE: if changing this mapping, REWORK RANDOM DATA CLASSIFICATION LABELS !!!
@@ -121,28 +129,29 @@ class KeystrokeFingerprintClassificator:
 
         data_bufs = {}
 
-        for data_path, class_ in self._dataname_to_class.items():
+        for data_paths, class_ in self._dataname_to_class.items():
 
             data_bufs.update({class_: []})
-            
-            with open(data_path, "rb") as data:
-                alldata = data.read()
+            for data_path in data_paths:
+                
+                with open(data_path, "rb") as data:
+                    alldata = data.read()
 
-            last_s, last_ms = 0, 0
+                last_s, last_ms = 0, 0
 
-            idx = 0
-            while idx < len(alldata):
+                idx = 0
+                while idx < len(alldata):
 
-                s = int.from_bytes(alldata[idx: idx + 8], 'little')
-                ms = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
+                    s = int.from_bytes(alldata[idx: idx + 8], 'little')
+                    ms = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
 
-                assert((s, ms) > (last_s, last_ms))
+                    assert((s, ms) > (last_s, last_ms))
 
-                data_bufs[class_].append((s, ms))
+                    data_bufs[class_].append((s, ms))
 
-                # print(f"{idx // 16}: {s}, {ms}")
+                    # print(f"{idx // 16}: {s}, {ms}")
 
-                idx += 16
+                    idx += 16
                 
         min_data_len = 2 ** 100
 
