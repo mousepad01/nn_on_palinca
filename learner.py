@@ -129,7 +129,21 @@ class KeystrokeFingerprintClassificator:
 
         data_bufs = {}
 
-        for data_paths, class_ in self._dataname_to_class.items():
+        # sort files by timestamps 
+        # so the loading function remains consistent
+
+        def _tstamp_cmp(path):
+
+            with open(path, "rb") as data:
+                return (int.from_bytes(data.read(8), 'little'),
+                        int.from_bytes(data.read(8), 'little'))
+
+        for class_, data_paths in self._class_to_dataname.items():
+            self._class_to_dataname[class_] = sorted(data_paths, key = _tstamp_cmp)
+
+        for class_, data_paths in self._class_to_dataname.items():
+
+            last_s, last_ms = 0, 0
 
             data_bufs.update({class_: []})
             for data_path in data_paths:
@@ -137,15 +151,14 @@ class KeystrokeFingerprintClassificator:
                 with open(data_path, "rb") as data:
                     alldata = data.read()
 
-                last_s, last_ms = 0, 0
-
                 idx = 0
                 while idx < len(alldata):
 
                     s = int.from_bytes(alldata[idx: idx + 8], 'little')
                     ms = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
 
-                    assert((s, ms) > (last_s, last_ms))
+                    assert((s, ms) >= (last_s, last_ms))
+                    last_s, last_ms = s, ms
 
                     data_bufs[class_].append((s, ms))
 
@@ -190,11 +203,11 @@ class KeystrokeFingerprintClassificator:
                     data_timeslices.append([])
 
                     current_timeslice_base_s = raw_data[idx][0]
-                    current_timeslice_base_ms = raw_data[idx][1] // self.micros_to_ms
+                    current_timeslice_base_ms = raw_data[idx][1]
                     current_timeslice_len = 0
 
-                data_timeslices[-1].append([(raw_data[idx][0] - current_timeslice_base_s) * self.micros_to_ms + 
-                                        raw_data[idx][1] // self.micros_to_ms - current_timeslice_base_ms])
+                data_timeslices[-1].append([(raw_data[idx][0] - current_timeslice_base_s) * 1000 + 
+                                        (raw_data[idx][1] - current_timeslice_base_ms) // self.micros_to_ms])
 
                 assert(data_timeslices[-1][-1][0] >= 0)
 
