@@ -82,6 +82,9 @@ class KeystrokeFingerprintClassificator:
         self.micros_to_ms = micros_to_ms
         """conversion between microseconds (raw_data[idx][1]) to 'miliseconds'"""
 
+        self.s_to_ms = 1000000 // micros_to_ms
+        """conversion between seconds (raw_data[idx][0]) to 'miliseconds'"""
+
         self.data_paths = data_paths
         self.new_timeslice_thresh = new_timeslice_thresh
         """threshold (in seconds) that forces a new timeslice"""
@@ -143,7 +146,7 @@ class KeystrokeFingerprintClassificator:
 
         for class_, data_paths in self._class_to_dataname.items():
 
-            last_s, last_ms = 0, 0
+            last_s, last_micros = 0, 0
 
             data_bufs.update({class_: []})
             for data_path in data_paths:
@@ -155,14 +158,14 @@ class KeystrokeFingerprintClassificator:
                 while idx < len(alldata):
 
                     s = int.from_bytes(alldata[idx: idx + 8], 'little')
-                    ms = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
+                    micros = int.from_bytes(alldata[idx + 8: idx + 16], 'little')
 
-                    assert((s, ms) >= (last_s, last_ms))
-                    last_s, last_ms = s, ms
+                    assert((s, micros) >= (last_s, last_micros))
+                    last_s, last_micros = s, micros
 
-                    data_bufs[class_].append((s, ms))
+                    data_bufs[class_].append((s, micros))
 
-                    # print(f"{idx // 16}: {s}, {ms}")
+                    # print(f"{idx // 16}: {s}, {micros}")
 
                     idx += 16
                 
@@ -187,8 +190,7 @@ class KeystrokeFingerprintClassificator:
 
             last_t = 0
 
-            current_timeslice_base_s = 0
-            current_timeslice_base_ms = 0
+            current_timeslice_base = 0
             current_timeslice_len = 0
             
             idx = 0
@@ -202,12 +204,11 @@ class KeystrokeFingerprintClassificator:
                     timeslice_idx += 1
                     data_timeslices.append([])
 
-                    current_timeslice_base_s = raw_data[idx][0]
-                    current_timeslice_base_ms = raw_data[idx][1]
+                    current_timeslice_base = raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms
                     current_timeslice_len = 0
 
-                data_timeslices[-1].append([(raw_data[idx][0] - current_timeslice_base_s) * 1000 + 
-                                        (raw_data[idx][1] - current_timeslice_base_ms) // self.micros_to_ms])
+                data_timeslices[-1].append([(raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms) - \
+                                                current_timeslice_base])
 
                 assert(data_timeslices[-1][-1][0] >= 0)
 
