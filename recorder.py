@@ -13,7 +13,6 @@ EV_KEY = 0x01
 EV_REP = 0x14
 
 input_event = Struct("llHHi")
-# TODO a wrapper for this ugly ass struct format would be nice 
 
 def detect_possible_keyboards():
     """parses /proc/bus/input/devices to find

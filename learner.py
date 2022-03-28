@@ -3,7 +3,7 @@ from math import floor
 import random
 import os.path
 
-from model import Res1D
+from model import Inception1D, Res1D
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,7 +29,6 @@ class ModelState(Enum):
     UNTRAINED = "untrained"
     TRAINED = "trained"
 
-# chicken anyone?
 class KeystrokeFingerprintClassificator:
     """Its task is to differentiate
         between different humans' keystroke timestamps
@@ -304,24 +303,21 @@ class KeystrokeFingerprintClassificator:
         self.model = Sequential([
             InputLayer(input_shape = (self.timeslice_len, 1)),
 
-            Res1D(16, kernel_size = 4),
+            Inception1D(16),
             BatchNormalization(),
             ReLU(),
-            #MaxPool1D(2),
 
-            Res1D(32, kernel_size = 3),
+            Inception1D(64),
             BatchNormalization(),
             ReLU(),
-            #MaxPool1D(2),
 
-            Res1D(64, kernel_size = 3),
+            Inception1D(256),
             BatchNormalization(),
             ReLU(),
-            #MaxPool1D(2),
 
             Flatten(),
 
-            Dense(64),
+            Dense(128),
             ReLU(),
 
             Dense(32),
