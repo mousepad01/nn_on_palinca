@@ -350,7 +350,7 @@ class KeystrokeFingerprintClassificator:
 
         assert(self.model_state is ModelState.UNINITIALIZED)
 
-        self.model = load_model(model_path, custom_objects={"Res1D": Res1D})
+        self.model = load_model(model_path, custom_objects={"Res1D": Res1D, "Inception1D": Inception1D})
         self.model_state = ModelState.TRAINED
 
     def save_model_(self, model_path):
@@ -422,15 +422,15 @@ class KeystrokeFingerprintClassificator:
         validation_data = []
         validation_data_labels = []
 
-        for class_, d in self.data.items():
+        for class_, d in self.v_data.items():
 
             validation_data.append(d)
             validation_data_labels.append(np.full((d.shape[0],), fill_value = class_))
 
         if self.versus_random:
             
-            validation_data.append(self.random_data)
-            validation_data_labels.append(np.full((self.random_data.shape[0],), fill_value = self.human_cnt))
+            validation_data.append(self.v_random_data)
+            validation_data_labels.append(np.full((self.v_random_data.shape[0],), fill_value = self.human_cnt))
 
         validation_data = tf.concat(validation_data, axis = 0)
         validation_data_labels = tf.concat(validation_data_labels, axis = 0)
