@@ -311,17 +311,28 @@ class KeystrokeFingerprintClassificator:
             BatchNormalization(),
             ReLU(),
 
-            Inception1D(256),
+            Res1D(256),
+            BatchNormalization(),
+            ReLU(),
+
+            Res1D(512),
+            BatchNormalization(),
+            ReLU(),
+
+            Res1D(1024),
+            BatchNormalization(),
+            ReLU(),
+
+            Res1D(1024),
             BatchNormalization(),
             ReLU(),
 
             Flatten(),
 
-            Dense(128),
+            Dense(64),
             ReLU(),
 
-            Dense(32),
-            ReLU(),
+            Dropout(0.4),
 
             Dense(16),
             ReLU(),
@@ -414,10 +425,6 @@ class KeystrokeFingerprintClassificator:
             assert(self.v_random_data_state is DataState.READY)
 
         assert(self.model_state is ModelState.TRAINED)
-
-        '''validation_data = tf.concat([self.v_data, self.v_random_data], axis = 0)
-        validation_data_labels = tf.concat([np.ones((self.v_data.shape[0],)), np.zeros((self.v_random_data.shape[0],))], axis = 0)
-        validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 2)'''
 
         validation_data = []
         validation_data_labels = []
