@@ -50,7 +50,7 @@ class Inception1D:
         """
 
     def __init__(self, filters):
-        super(Res1D, self).__init__()
+        super(Inception1D, self).__init__()
 
         # branch 0
 
