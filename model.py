@@ -1,5 +1,6 @@
 """Misc model-related classes used globally in this project"""
 
+import tensorflow_addons as tfa
 import tensorflow as tf
 from tensorflow.keras.models import *
 from tensorflow.keras.layers import *
@@ -109,3 +110,22 @@ class Inception1D(Layer):
         # concatenation
 
         return tf.concat([output_branch0, output_branch1], axis=1)
+
+# https://arxiv.org/pdf/2004.11362.pdf
+# https://keras.io/examples/vision/supervised-contrastive-learning/
+class SupCon(Loss):
+    
+    def __init__(self, temperature = 1):
+        super(SupCon, self).__init__()
+
+        self.temperature = temperature
+
+    def __call__(self, labels, feature_vectors, sample_weight = None):
+        
+        # obtaining cosine distances, then scale them with temperature
+
+        feature_vectors = tf.math.l2_normalize(feature_vectors, axis = 1)
+        feature_matrix = tf.math.divide(tf.matmul(feature_vectors, tf.transpose(feature_vectors)), self.temperature)
+
+        # softmax and then cross entropy on the previously calculated distances
+        return tfa.losses.npairs_loss(tf.squeeze(labels), feature_matrix)

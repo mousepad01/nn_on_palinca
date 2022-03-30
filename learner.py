@@ -3,7 +3,7 @@ from math import floor
 import random
 import os.path
 
-from model import Inception1D, Res1D
+from model import *
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,7 +38,10 @@ class KeystrokeFingerprintClassificator:
                 set versus_random to True
                 (if versus_random is false, other random params will be ignored)"""
 
-    def __init__(self, data_paths = ["timestamps.bin"],
+    def __init__(self, 
+                        contrastive_learning = True,
+
+                        data_paths = ["timestamps.bin"],
                         new_timeslice_thresh = 4,
                         micros_to_ms = 1000,
                         timeslice_len = 15,
@@ -65,7 +68,7 @@ class KeystrokeFingerprintClassificator:
         assert(timeslice_len > 0)
         assert(random_to_human_ratio > 0) 
         assert(random_min_decal > 0)
-        assert(random_max_decal < new_timeslice_thresh * micros_to_ms)
+        assert(random_max_decal < new_timeslice_thresh * (1000000 // micros_to_ms))
         assert(0 < validation_ratio < 1)
 
         self.human_cnt = len(data_paths)
@@ -115,9 +118,24 @@ class KeystrokeFingerprintClassificator:
         self.validation_ratio = validation_ratio
         """how much data to be used as validation data"""
 
+        self.contrastive_learning = contrastive_learning
+        """whether the model is trained with contrastive learning
+            or in a 'classic' manner"""
+
         self.model_state = ModelState.UNINITIALIZED
         self.model = None
-        """model"""
+        """ (final) model"""
+
+        if self.contrastive_learning:
+            
+            self.encoder = None
+            """convolutional part of the model"""
+
+            self.projection_head = None
+            """used for creating the embedding vector"""
+
+            self.classifier = None
+            """attach to encoder to obtain the final classificator model"""
 
         """ONLY FOR INTERNAL USE"""
         self._dataname_to_class = {tuple(data_paths[idx]): idx for idx in range(len(data_paths))}
@@ -294,58 +312,64 @@ class KeystrokeFingerprintClassificator:
 
     # model
 
-    def init_model(self, optimizer = SGD(1e-4, 0.9),
-                            loss = CategoricalCrossentropy(), 
+    def init_model(self, classifier_optimizer = SGD(1e-5, 0.9),
+                            classifier_loss = CategoricalCrossentropy(),
+                            
+                            contrastive_optimizer = SGD(1e-5, 0.9),
+                            contrastive_loss = SupCon(0.05),
+                            
                             metrics = ['accuracy']):
+
+        """NOTE: ignore cntrastive optimizer and contrastive loss
+                    if contrastive learning is not applied"""
 
         assert(self.model_state is ModelState.UNINITIALIZED)
 
-        self.model = Sequential([
-            InputLayer(input_shape = (self.timeslice_len, 1)),
+        def _init_classic_model():
+            
+            self.model = Sequential([
+                InputLayer(input_shape = (self.timeslice_len, 1)),
 
-            Inception1D(16),
-            BatchNormalization(),
-            ReLU(),
+                Inception1D(16),
+                BatchNormalization(),
+                ReLU(),
 
-            Inception1D(64),
-            BatchNormalization(),
-            ReLU(),
+                Inception1D(64),
+                BatchNormalization(),
+                ReLU(),
 
-            Res1D(256),
-            BatchNormalization(),
-            ReLU(),
+                Inception1D(256),
+                BatchNormalization(),
+                ReLU(),
 
-            Res1D(512),
-            BatchNormalization(),
-            ReLU(),
+                Flatten(),
 
-            Res1D(1024),
-            BatchNormalization(),
-            ReLU(),
+                Dense(64),
+                ReLU(),
 
-            Res1D(1024),
-            BatchNormalization(),
-            ReLU(),
+                Dropout(0.4),
 
-            Flatten(),
+                Dense(16),
+                ReLU(),
 
-            Dense(64),
-            ReLU(),
+                Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
+                Softmax()
+            ])
 
-            Dropout(0.4),
+            self.model.compile(optimizer = classifier_optimizer, 
+                                loss = classifier_loss, 
+                                metrics = metrics)
 
-            Dense(16),
-            ReLU(),
+            self.model_state = ModelState.UNTRAINED
 
-            Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
-            Softmax()
-        ])
+        def _init_contrastive_model():
+            pass
 
-        self.model.compile(optimizer = optimizer, 
-                            loss = loss, 
-                            metrics = metrics)
+        if self.contrastive_learning is True:
+            return _init_contrastive_model()
 
-        self.model_state = ModelState.UNTRAINED
+        else:
+            return _init_classic_model()
 
     def load_best_model(self):
 
@@ -378,10 +402,6 @@ class KeystrokeFingerprintClassificator:
             assert(self.random_data_state is DataState.READY)
 
         assert(self.model_state in [ModelState.UNTRAINED, ModelState.TRAINED])
-
-        '''train_data = tf.concat([self.data, self.random_data], axis = 0)
-        train_data_labels = tf.concat([np.ones((self.data.shape[0],)), np.zeros((self.random_data.shape[0],))], axis = 0)
-        train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 2)'''
 
         train_data = []
         train_data_labels = []
