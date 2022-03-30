@@ -123,25 +123,38 @@ class KeystrokeFingerprintClassificator:
             or in a 'classic' manner"""
 
         self.model_state = ModelState.UNINITIALIZED
-        self.model = None
+        self.model: Model = None
         """ (final) model"""
 
         if self.contrastive_learning:
             
-            self.encoder = None
+            self.encoder: Model = None
             """convolutional part of the model"""
 
-            self.projection_head = None
+            self.feature_extractor: Model = None
             """used for creating the embedding vector"""
 
-            self.classifier = None
+            self.classifier: Model = None
             """attach to encoder to obtain the final classificator model"""
 
-        """ONLY FOR INTERNAL USE"""
+        """DECLARED BELOW, ONLY FOR INTERNAL USE"""
+
         self._dataname_to_class = {tuple(data_paths[idx]): idx for idx in range(len(data_paths))}
         self._class_to_dataname = {idx: data_paths[idx] for idx in range(len(data_paths))}
         # currently redundant, but to make sure no bugs appear due to list operations
         # NOTE: if changing this mapping, REWORK RANDOM DATA CLASSIFICATION LABELS !!!
+
+        if self.contrastive_learning:
+
+            self._contrastive_loss = None
+            self._contrastive_optimizer = None
+
+            self._classifier_loss = None
+            self._classifier_optimizer = None
+
+            self._metrics = None
+
+            """auxiliary variables"""
 
     # data
 
@@ -326,6 +339,8 @@ class KeystrokeFingerprintClassificator:
         assert(self.model_state is ModelState.UNINITIALIZED)
 
         def _init_classic_model():
+
+            assert(self.human_cnt if not self.versus_random else self.human_cnt + 1 <= 16)
             
             self.model = Sequential([
                 InputLayer(input_shape = (self.timeslice_len, 1)),
@@ -363,7 +378,67 @@ class KeystrokeFingerprintClassificator:
             self.model_state = ModelState.UNTRAINED
 
         def _init_contrastive_model():
-            pass
+            
+            self.encoder = \
+                Sequential([
+
+                    InputLayer(input_shape = (self.timeslice_len, 1)),
+
+                    Inception1D(16),
+                    BatchNormalization(),
+                    ReLU(),
+
+                    Inception1D(64),
+                    BatchNormalization(),
+                    ReLU(),
+
+                    Inception1D(256),
+                    BatchNormalization(),
+                    ReLU(),
+
+                    Flatten()
+                ])
+
+            self.feature_extractor = \
+                Sequential([
+
+                    self.encoder,
+
+                    Dense(64),
+                    ReLU()
+                ])
+
+            self.classifier = None # later, after training
+            '''Sequential([
+
+                    self.encoder,
+
+                    Dropout(0.4),
+
+                    Dense(64),
+                    ReLU(),
+
+                    Dropout(0.4),
+
+                    Dense(16),
+                    ReLU(),
+
+                    Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
+                    Softmax()
+                ])'''
+
+            self.model = self.classifier    # this will hold even after training 
+                                            # (currently, does nothing since classifier is None)
+
+            self._contrastive_loss = contrastive_loss
+            self._contrastive_optimizer = contrastive_optimizer
+
+            self._classifier_loss = classifier_loss
+            self._classifier_optimizer = classifier_optimizer
+
+            self._metrics = metrics
+
+            self.model_state = ModelState.UNTRAINED
 
         if self.contrastive_learning is True:
             return _init_contrastive_model()
@@ -371,7 +446,12 @@ class KeystrokeFingerprintClassificator:
         else:
             return _init_classic_model()
 
+    # TODO rework load/save model for contrastive learning
+
     def load_best_model(self):
+
+        if self.contrastive_learning is True:
+            raise RuntimeError("save/load not currently supported for contrastive learning")
 
         with open(f"{MODEL_PATH_PREFFIX}best_accuracy.txt", "rb") as bestscore_f:
             bestscore = int.from_bytes(bestscore_f.read(8), 'little')
@@ -383,12 +463,19 @@ class KeystrokeFingerprintClassificator:
 
     def load_model_(self, model_path):
 
+        if self.contrastive_learning is True:
+            raise RuntimeError("save/load not currently supported for contrastive learning")
+
         assert(self.model_state is ModelState.UNINITIALIZED)
 
         self.model = load_model(model_path, custom_objects={"Res1D": Res1D, "Inception1D": Inception1D})
         self.model_state = ModelState.TRAINED
 
     def save_model_(self, model_path):
+
+        if self.contrastive_learning is True:
+            raise RuntimeError("save/load not currently supported for contrastive learning")
+
         self.model.save(model_path, overwrite=True)
 
     def train_model(self, save_model_name = None,
@@ -423,14 +510,75 @@ class KeystrokeFingerprintClassificator:
 
         print(f"\n[i] training started\n")
 
-        history = self.model.fit(x = train_data, y = train_data_labels,
+        def _train_classic():
+
+            history = self.model.fit(x = train_data, y = train_data_labels,
                                     batch_size = batch_size,
                                     epochs = epochs)
+
+            return history.history
+
+        def _train_contrastive():
+
+            print(f"\n[i] contrastive learning phase started\n")
+
+            self.feature_extractor.compile(optimizer = self._contrastive_optimizer, 
+                                            loss = self._contrastive_loss, 
+                                            metrics = self._metrics)
+
+            history_fst = self.feature_extractor.fit(x = train_data, y = train_data_labels,
+                                                    batch_size = batch_size,
+                                                    epochs = epochs)
+
+            print(f"\n[i] contrastive learning phase ended\n")
+            print(f"\n[i] classifier training started\n")
+
+            # freeze encoder weights
+            for layer in self.encoder.layers:
+                layer.trainable = False
+
+            self.classifier = \
+                Sequential([
+
+                    self.encoder,
+
+                    Dropout(0.4),
+
+                    Dense(64),
+                    ReLU(),
+
+                    Dropout(0.4),
+
+                    Dense(16),
+                    ReLU(),
+
+                    Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
+                    Softmax()
+                ])
+
+            self.classifier.compile(optimizer = self._classifier_optimizer, 
+                                    loss = self._classifier_loss, 
+                                    metrics = self._metrics)
+
+            history_snd = self.classifier.fit(x = train_data, y = train_data_labels,
+                                                batch_size = batch_size,
+                                                epochs = epochs)
+
+            self.model = self.classifier
+
+            history = {"contrastive": history_fst.history, "classifier": history_snd.history}
+            return history
+
+        if self.contrastive_learning:
+            history = _train_contrastive()
+
+        else:
+            history = _train_classic()
 
         print(f"\n[i] training ended\n")
 
         if display_history:
-            self.display_stats(history.history)
+            self.display_stats(history)
 
         self.model_state = ModelState.TRAINED
 
