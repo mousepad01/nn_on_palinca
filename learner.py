@@ -328,8 +328,8 @@ class KeystrokeFingerprintClassificator:
     def init_model(self, classifier_optimizer = SGD(1e-5, 0.9),
                             classifier_loss = CategoricalCrossentropy(),
                             
-                            contrastive_optimizer = SGD(1e-5, 0.9),
-                            contrastive_loss = SupCon(0.05),
+                            contrastive_optimizer = SGD(1e-6, 0.9),
+                            contrastive_loss = SupCon(0.1),
                             
                             metrics = ['accuracy']):
 
@@ -505,12 +505,17 @@ class KeystrokeFingerprintClassificator:
 
         train_data = tf.concat(train_data, axis = 0)
         train_data_labels = tf.concat(train_data_labels, axis = 0)
-        train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 
-                                self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
         print(f"\n[i] training started\n")
 
         def _train_classic():
+
+            nonlocal train_data
+            nonlocal train_data_labels
+            
+            # one-hot encoding
+            train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 
+                                self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
             history = self.model.fit(x = train_data, y = train_data_labels,
                                     batch_size = batch_size,
@@ -520,11 +525,13 @@ class KeystrokeFingerprintClassificator:
 
         def _train_contrastive():
 
+            nonlocal train_data
+            nonlocal train_data_labels
+
             print(f"\n[i] contrastive learning phase started\n")
 
             self.feature_extractor.compile(optimizer = self._contrastive_optimizer, 
-                                            loss = self._contrastive_loss, 
-                                            metrics = self._metrics)
+                                            loss = self._contrastive_loss)
 
             history_fst = self.feature_extractor.fit(x = train_data, y = train_data_labels,
                                                     batch_size = batch_size,
@@ -560,6 +567,9 @@ class KeystrokeFingerprintClassificator:
                                     loss = self._classifier_loss, 
                                     metrics = self._metrics)
 
+            train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 
+                                self.human_cnt if not self.versus_random else self.human_cnt + 1)
+
             history_snd = self.classifier.fit(x = train_data, y = train_data_labels,
                                                 batch_size = batch_size,
                                                 epochs = epochs)
@@ -578,7 +588,7 @@ class KeystrokeFingerprintClassificator:
         print(f"\n[i] training ended\n")
 
         if display_history:
-            self.display_stats(history)
+            self.display_stats(history, self.contrastive_learning)
 
         self.model_state = ModelState.TRAINED
 
@@ -664,25 +674,71 @@ class KeystrokeFingerprintClassificator:
         tf.random.set_seed(seed)
         np.random.seed(seed)
 
-    def display_stats(self, stats: dict):
+    def display_stats(self, stats: dict, contrastive_learning: bool = False):
         """display stats
             (currently only for accuracy and loss)"""
 
-        assert('accuracy' in stats.keys() and 'loss' in stats.keys())
+        def _plot_classic():
 
-        epoch_axis = [i for i in range(1, len(stats['accuracy']) + 1)]
+            assert('accuracy' in stats.keys() and 'loss' in stats.keys())
 
-        fig, acc_loss_epoch = plt.subplots(1)
+            epoch_axis = [i for i in range(1, len(stats['accuracy']) + 1)]
+
+            fig, acc_loss_epoch = plt.subplots(1)
+            
+            acc_loss_epoch.plot(epoch_axis,
+                                stats['accuracy'],
+                                color = 'green',
+                                label = 'accuracy')
+
+            acc_loss_epoch.plot(epoch_axis,
+                                stats['loss'],
+                                color = 'blue',
+                                label = 'loss')
+
+            acc_loss_epoch.legend(loc = "upper left")
+            plt.show()
+
+        def _plot_contrastive_learning():
+            
+            assert('contrastive' in stats.keys() and 'classifier' in stats.keys())
+
+            h_fst = stats["contrastive"]
+            h_snd = stats["classifier"]
+
+            assert('loss' in h_fst.keys())
+            assert('accuracy' in h_snd.keys() and 'loss' in h_snd.keys())
+
+            # NOTE: same number of epochs for both training steps
+            epoch_axis = [i for i in range(1, len(h_fst['loss']) + 1)]
+
+            fig, (loss_contrastive, acc_loss_classifier) = plt.subplots(2)
+
+            loss_contrastive.set_title("Encoder trainig loss")
+            acc_loss_classifier.set_title("Classifier training loss and accuracy")
+
+            loss_contrastive.plot(epoch_axis,
+                                    h_fst['loss'],
+                                    color = 'blue',
+                                    label = 'loss')
+            
+            acc_loss_classifier.plot(epoch_axis,
+                                        h_snd['accuracy'],
+                                        color = 'green',
+                                        label = 'accuracy')
+
+            acc_loss_classifier.plot(epoch_axis,
+                                        h_snd['loss'],
+                                        color = 'blue',
+                                        label = 'loss')
+
+            acc_loss_classifier.legend(loc = "upper left")
+            plt.show()
+
+        if contrastive_learning:
+            _plot_contrastive_learning()
+
+        else:
+            _plot_classic()
+
         
-        acc_loss_epoch.plot(epoch_axis,
-                            stats['accuracy'],
-                            color = 'green',
-                            label = 'accuracy')
-
-        acc_loss_epoch.plot(epoch_axis,
-                            stats['loss'],
-                            color = 'blue',
-                            label = 'loss')
-
-        acc_loss_epoch.legend(loc = "upper left")
-        plt.show()
