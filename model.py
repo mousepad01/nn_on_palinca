@@ -127,7 +127,5 @@ class SupCon(Loss):
         feature_vectors = tf.math.l2_normalize(feature_vectors, axis = 1)
         feature_matrix = tf.divide(tf.matmul(feature_vectors, tf.transpose(feature_vectors)), self.temperature)
 
-        print(feature_vectors.shape, labels.shape, feature_matrix.shape)
-
         # softmax and then cross entropy on the previously calculated distances
-        return tfa.losses.npairs_loss(tf.squeeze(labels, axis=1), feature_matrix)
+        return tfa.losses.npairs_loss(tf.squeeze(labels, axis = 1), feature_matrix)
