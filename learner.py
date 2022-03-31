@@ -325,10 +325,10 @@ class KeystrokeFingerprintClassificator:
 
     # model
 
-    def init_model(self, classifier_optimizer = SGD(1e-5, 0.9),
+    def init_model(self, classifier_optimizer = SGD(1e-4, 0.9),
                             classifier_loss = CategoricalCrossentropy(),
                             
-                            contrastive_optimizer = SGD(1e-6, 0.9),
+                            contrastive_optimizer = SGD(1e-5, 0.9),
                             contrastive_loss = SupCon(0.1),
                             
                             metrics = ['accuracy']):
@@ -549,8 +549,6 @@ class KeystrokeFingerprintClassificator:
 
                     self.encoder,
 
-                    Dropout(0.4),
-
                     Dense(64),
                     ReLU(),
 
@@ -740,5 +738,3 @@ class KeystrokeFingerprintClassificator:
 
         else:
             _plot_classic()
-
-        
