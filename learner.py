@@ -404,7 +404,7 @@ class KeystrokeFingerprintClassificator:
 
                     self.encoder,
 
-                    Dense(64),
+                    Dense(128),
                     ReLU()
                 ])
 
@@ -530,6 +530,8 @@ class KeystrokeFingerprintClassificator:
 
             print(f"\n[i] contrastive learning phase started\n")
 
+            print(train_data.shape, train_data_labels.shape)
+
             self.feature_extractor.compile(optimizer = self._contrastive_optimizer, 
                                             loss = self._contrastive_loss)
 
@@ -549,10 +551,13 @@ class KeystrokeFingerprintClassificator:
 
                     self.encoder,
 
-                    Dense(64),
+                    Dense(128),
                     ReLU(),
 
                     Dropout(0.4),
+
+                    Dense(64),
+                    ReLU(),
 
                     Dense(16),
                     ReLU(),

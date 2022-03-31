@@ -121,11 +121,13 @@ class SupCon(Loss):
         self.temperature = temperature
 
     def __call__(self, labels, feature_vectors, sample_weight = None):
-        
+
         # obtaining cosine distances, then scale them with temperature
 
         feature_vectors = tf.math.l2_normalize(feature_vectors, axis = 1)
         feature_matrix = tf.divide(tf.matmul(feature_vectors, tf.transpose(feature_vectors)), self.temperature)
 
+        print(feature_vectors.shape, labels.shape, feature_matrix.shape)
+
         # softmax and then cross entropy on the previously calculated distances
-        return tfa.losses.npairs_loss(tf.squeeze(labels), feature_matrix)
+        return tfa.losses.npairs_loss(tf.squeeze(labels, axis=1), feature_matrix)
