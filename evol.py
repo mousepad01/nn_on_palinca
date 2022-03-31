@@ -293,7 +293,7 @@ class Evolvable:
 
                 self.learner.model_state = ModelState.UNTRAINED
                 self.learner.train_model(save_model_name=None, display_history=False,
-                                            epochs=self.train_epoch_cnt,
+                                            classifier_epochs=self.train_epoch_cnt,
                                             batch_size=batch_size)
 
                 validation_results = self.learner.validate(save_model_name = "evolved_best_model")

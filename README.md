@@ -14,4 +14,7 @@ Quick update: with a relatively basic model of up to 8 residual layers with 1d c
               on the binary classification: human data vs random
               (short documentation will be posted soon)
 
+Another update: ~75% validation accuracy on human vs human (2 classes),
+                with supervised contrastive learning and custom inception blocks
+
 (Linux only)

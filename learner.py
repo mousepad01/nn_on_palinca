@@ -328,7 +328,7 @@ class KeystrokeFingerprintClassificator:
     def init_model(self, classifier_optimizer = SGD(1e-4, 0.9),
                             classifier_loss = CategoricalCrossentropy(),
                             
-                            contrastive_optimizer = SGD(1e-5, 0.9),
+                            contrastive_optimizer = SGD(1e-4, 0.9),
                             contrastive_loss = SupCon(0.1),
                             
                             metrics = ['accuracy']):
@@ -412,9 +412,7 @@ class KeystrokeFingerprintClassificator:
             '''Sequential([
 
                     self.encoder,
-
-                    Dropout(0.4),
-
+                    
                     Dense(64),
                     ReLU(),
 
@@ -480,7 +478,10 @@ class KeystrokeFingerprintClassificator:
 
     def train_model(self, save_model_name = None,
                             batch_size = 32,
-                            epochs = 10,
+
+                            encoder_epochs = 150,
+                            classifier_epochs = 100,
+
                             display_history = True):
 
         assert(self.data_state is DataState.READY)
@@ -506,6 +507,27 @@ class KeystrokeFingerprintClassificator:
         train_data = tf.concat(train_data, axis = 0)
         train_data_labels = tf.concat(train_data_labels, axis = 0)
 
+        # shuffling
+        # not necessary ?
+
+        train_data_ = [train_data[i] for i in range(train_data.shape[0])]
+        train_data_labels_ = [train_data_labels[i] for i in range(train_data_labels.shape[0])]
+
+        for i in range(len(train_data_) - 1):
+
+            j = random.randint(0, i)
+
+            aux = train_data_[i]
+            train_data_[i] = train_data_[j]
+            train_data_[j] = aux
+
+            aux = train_data_labels_[i]
+            train_data_labels_[i] = train_data_labels_[j]
+            train_data_labels_[j] = aux
+
+        train_data = tf.stack(train_data_, axis=0)
+        train_data_labels = tf.stack(train_data_labels_, axis=0)
+
         print(f"\n[i] training started\n")
 
         def _train_classic():
@@ -519,7 +541,7 @@ class KeystrokeFingerprintClassificator:
 
             history = self.model.fit(x = train_data, y = train_data_labels,
                                     batch_size = batch_size,
-                                    epochs = epochs)
+                                    epochs = classifier_epochs)
 
             return history.history
 
@@ -530,14 +552,12 @@ class KeystrokeFingerprintClassificator:
 
             print(f"\n[i] contrastive learning phase started\n")
 
-            print(train_data.shape, train_data_labels.shape)
-
             self.feature_extractor.compile(optimizer = self._contrastive_optimizer, 
                                             loss = self._contrastive_loss)
 
             history_fst = self.feature_extractor.fit(x = train_data, y = train_data_labels,
                                                     batch_size = batch_size,
-                                                    epochs = epochs)
+                                                    epochs = encoder_epochs)
 
             print(f"\n[i] contrastive learning phase ended\n")
             print(f"\n[i] classifier training started\n")
@@ -575,7 +595,7 @@ class KeystrokeFingerprintClassificator:
 
             history_snd = self.classifier.fit(x = train_data, y = train_data_labels,
                                                 batch_size = batch_size,
-                                                epochs = epochs)
+                                                epochs = classifier_epochs)
 
             self.model = self.classifier
 
@@ -712,30 +732,34 @@ class KeystrokeFingerprintClassificator:
             assert('loss' in h_fst.keys())
             assert('accuracy' in h_snd.keys() and 'loss' in h_snd.keys())
 
-            # NOTE: same number of epochs for both training steps
-            epoch_axis = [i for i in range(1, len(h_fst['loss']) + 1)]
+            epoch_axis_fst = [i for i in range(1, len(h_fst['loss']) + 1)]
+            epoch_axis_snd = [i for i in range(1, len(h_snd['loss']) + 1)]
 
             fig, (loss_contrastive, acc_loss_classifier) = plt.subplots(2)
 
             loss_contrastive.set_title("Encoder trainig loss")
             acc_loss_classifier.set_title("Classifier training loss and accuracy")
 
-            loss_contrastive.plot(epoch_axis,
+            loss_contrastive.plot(epoch_axis_fst,
                                     h_fst['loss'],
                                     color = 'blue',
                                     label = 'loss')
+
+            loss_contrastive.grid(True)
             
-            acc_loss_classifier.plot(epoch_axis,
+            acc_loss_classifier.plot(epoch_axis_snd,
                                         h_snd['accuracy'],
                                         color = 'green',
                                         label = 'accuracy')
 
-            acc_loss_classifier.plot(epoch_axis,
+            acc_loss_classifier.plot(epoch_axis_snd,
                                         h_snd['loss'],
                                         color = 'blue',
                                         label = 'loss')
 
             acc_loss_classifier.legend(loc = "upper left")
+            acc_loss_classifier.grid(True)
+
             plt.show()
 
         if contrastive_learning:
