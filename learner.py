@@ -333,7 +333,7 @@ class KeystrokeFingerprintClassificator:
                             
                             metrics = ['accuracy']):
 
-        """NOTE: ignore cntrastive optimizer and contrastive loss
+        """NOTE: ignore contrastive optimizer and contrastive loss
                     if contrastive learning is not applied"""
 
         assert(self.model_state is ModelState.UNINITIALIZED)
