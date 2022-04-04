@@ -389,19 +389,24 @@ class KeystrokeFingerprintClassificator:
             
             if self.rnn:
                 
-                # https://arxiv.org/abs/2101.05570
                 self.encoder = \
                     Sequential([
 
                         InputLayer(input_shape = (self.timeslice_len, 1)),
 
+                        Inception1D(16),
                         BatchNormalization(),
-                        LSTM(128),
+                        ReLU(),
 
-                        #Dropout(0.5),
-
+                        Inception1D(64),
                         BatchNormalization(),
-                        LSTM(128),
+                        ReLU(),
+
+                        Inception1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        LSTM(256),
 
                         Flatten()
                     ])
