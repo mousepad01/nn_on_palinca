@@ -15,6 +15,10 @@ from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
 
+# silence lots of useless and annoying tensorflow logs
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
 MODEL_PATH_PREFFIX = "./model_data_multi/"
 
 class DataState(Enum):
@@ -40,6 +44,7 @@ class KeystrokeFingerprintClassificator:
 
     def __init__(self, 
                         contrastive_learning = True,
+                        rnn = False,
 
                         data_paths = ["timestamps.bin"],
                         new_timeslice_thresh = 4,
@@ -73,6 +78,9 @@ class KeystrokeFingerprintClassificator:
 
         self.human_cnt = len(data_paths)
         """number of classes (-1 if versus_random is true)"""
+
+        self.rnn = rnn
+        """whether the model uses RNN or CNN variations"""
 
         self.versus_random = versus_random
         """whether to include random as a class, or classify only
@@ -379,25 +387,46 @@ class KeystrokeFingerprintClassificator:
 
         def _init_contrastive_model():
             
-            self.encoder = \
-                Sequential([
+            if self.rnn:
+                
+                # https://arxiv.org/abs/2101.05570
+                self.encoder = \
+                    Sequential([
 
-                    InputLayer(input_shape = (self.timeslice_len, 1)),
+                        InputLayer(input_shape = (self.timeslice_len, 1)),
 
-                    Inception1D(16),
-                    BatchNormalization(),
-                    ReLU(),
+                        BatchNormalization(),
+                        LSTM(128),
 
-                    Inception1D(64),
-                    BatchNormalization(),
-                    ReLU(),
+                        #Dropout(0.5),
 
-                    Inception1D(256),
-                    BatchNormalization(),
-                    ReLU(),
+                        BatchNormalization(),
+                        LSTM(128),
 
-                    Flatten()
-                ])
+                        Flatten()
+                    ])
+
+            else:
+
+                self.encoder = \
+                    Sequential([
+
+                        InputLayer(input_shape = (self.timeslice_len, 1)),
+
+                        Inception1D(16),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(64),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Flatten()
+                    ])
 
             self.feature_extractor = \
                 Sequential([

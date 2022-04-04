@@ -44,10 +44,11 @@ class Res1D(Layer):
         output_tensor = self.a1(_tmp)
         return output_tensor
 
+# less optimised?
 class Inception1D(Layer):
     """implementation of a custom inception layer
         does not take parameters, all of them are fixed\n
-        (batch, filters, size) -> (batch, filters * 2, size)
+        (batch, size, filters in) -> (batch, size * 2, filters)
         """
 
     def __init__(self, filters):
@@ -106,6 +107,76 @@ class Inception1D(Layer):
 
         _tmp2 = self.conv_id_b1(input_tensor)
         output_branch1 += _tmp2
+
+        # concatenation
+
+        return tf.concat([output_branch0, output_branch1], axis=1)
+
+# TODO test, eliminated one separate res connection
+class Inception1D_(Layer):
+    """implementation of a custom inception layer
+        does not take parameters, all of them are fixed\n
+        (batch, size, filters in) -> (batch, size * 2, filters)
+        """
+
+    def __init__(self, filters):
+        super(Inception1D, self).__init__()
+
+        # residual connection
+
+        self.conv_id = Conv1D(filters=filters, kernel_size=1)
+
+        # branch 0
+
+        self.conv_b0_0 = Conv1D(filters=filters, kernel_size=3, padding='same')
+        self.n_b0_0 = BatchNormalization()
+        self.a_b0_0 = Activation('relu')
+
+        self.conv_b0_1 = Conv1D(filters=filters, kernel_size=3, padding='same')
+        self.n_b0_1 = BatchNormalization()
+
+        # branch 1
+
+        self.conv_b1_0 = Conv1D(filters=filters, kernel_size=3, padding='same')
+        self.conv_b1_01 = Conv1D(filters=filters, kernel_size=3, padding='same')
+        self.n_b1_0 = BatchNormalization()
+        self.a_b1_0 = Activation('relu')
+
+        self.conv_b1_1 = Conv1D(filters=filters, kernel_size=3, padding='same')
+        self.n_b1_1 = BatchNormalization()
+
+        # final
+
+        self.a_fin = Activation('relu')
+
+    def call(self, input_tensor):
+
+        # residual connection
+
+        _tmp_id = self.conv_id(input_tensor)
+        
+        # branch 0
+
+        _tmp = self.conv_b0_0(input_tensor)
+        _tmp = self.n_b0_0(_tmp)
+        _tmp = self.a_b0_0(_tmp)
+
+        _tmp = self.conv_b0_1(_tmp)
+        output_branch0 = self.n_b0_1(_tmp)
+
+        output_branch0 += _tmp_id
+
+        # branch 1
+        
+        _tmp = self.conv_b1_0(input_tensor)
+        _tmp = self.conv_b1_01(_tmp)
+        _tmp = self.n_b1_0(_tmp)
+        _tmp = self.a_b1_0(_tmp)
+
+        _tmp = self.conv_b1_1(_tmp)
+        output_branch1 = self.n_b1_1(_tmp)
+
+        output_branch1 += _tmp_id
 
         # concatenation
 
