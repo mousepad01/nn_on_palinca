@@ -221,7 +221,9 @@ class KeystrokeFingerprintClassificator:
             min_data_len = min(min_data_len, len(data_bufs[class_]))
 
         for class_ in data_bufs.keys():
-            data_bufs[class_] = data_bufs[class_][:min_data_len]
+            
+            start_moment = random.randint(0, len(data_bufs[class_]) - min_data_len)
+            data_bufs[class_] = data_bufs[class_][start_moment: start_moment + min_data_len]
 
         self.data = data_bufs
         self.data_state = DataState.RAW
@@ -262,13 +264,13 @@ class KeystrokeFingerprintClassificator:
                     timeslice_idx += 1
                     data_timeslices.append([])
 
-                    if self.overlap_timeslices:
+                    if self.overlap_timeslices is True:
                         idx -= self.timeslice_len // 2
 
                     current_timeslice_base = raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms
                     current_timeslice_len = 0
 
-                    if self.overlap_timeslices:
+                    if self.overlap_timeslices is True:
                         overlapped = not overlapped
 
                 data_timeslices[-1].append([(raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms) - \
