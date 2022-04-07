@@ -101,7 +101,8 @@ class KeystrokeFingerprintClassificator:
         """data paths"""
 
         self.overlap_timeslices = overlap_timeslices
-        """whether to train with partially overlapping sequences"""
+        """whether to train with partially overlapping sequences
+            NOTE: validation sequences are NEVER overlap"""
 
         self.new_timeslice_thresh = new_timeslice_thresh
         """threshold (in seconds) that forces a new timeslice"""
@@ -241,22 +242,37 @@ class KeystrokeFingerprintClassificator:
             idx = 0
             timeslice_idx = -1
 
+            # if self.overlap_timeslices is False, it never changes
+            overlapped = False
+
             while idx < len(raw_data):
 
-                if current_timeslice_len == self.timeslice_len + 1 or \
-                    raw_data[idx][0] - last_t > self.new_timeslice_thresh:
+                if raw_data[idx][0] - last_t > self.new_timeslice_thresh:
                     
                     timeslice_idx += 1
                     data_timeslices.append([])
 
-                    if self.overlap_timeslices and (raw_data[idx][0] - last_t <= self.new_timeslice_thresh):
+                    current_timeslice_base = raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms
+                    current_timeslice_len = 0
+
+                    overlapped = False
+
+                elif current_timeslice_len == self.timeslice_len + 1:
+
+                    timeslice_idx += 1
+                    data_timeslices.append([])
+
+                    if self.overlap_timeslices:
                         idx -= self.timeslice_len // 2
 
                     current_timeslice_base = raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms
                     current_timeslice_len = 0
 
+                    if self.overlap_timeslices:
+                        overlapped = not overlapped
+
                 data_timeslices[-1].append([(raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms) - \
-                                                current_timeslice_base])
+                                                current_timeslice_base, overlapped])
 
                 assert(data_timeslices[-1][-1][0] >= 0)
 
@@ -264,19 +280,47 @@ class KeystrokeFingerprintClassificator:
                 last_t = raw_data[idx][0]
                 idx += 1
 
+            random.shuffle(self.data[class_])
+
+            non_overlapped_cnt = 0
+
             self.data[class_] = []
             for tslice in data_timeslices:
 
                 assert(len(tslice) <= self.timeslice_len + 1)
 
+                if tslice[0][1] == False:
+                    non_overlapped_cnt += 1
+
                 if len(tslice) == self.timeslice_len + 1:
                     self.data[class_].append(tslice[1:])    # first entry always 0, also add a 'dummy' dimension
 
-            v_data_len = int(self.validation_ratio * len(self.data[class_]))
-            splitpoint = random.randint(0, len(self.data[class_]) - v_data_len)
+            # separate train data from validation data
 
-            self.v_data.update({class_: self.data[class_][splitpoint: splitpoint + v_data_len]})
-            self.data[class_] = self.data[class_][:splitpoint] + self.data[class_][splitpoint + v_data_len:]
+            v_data_len = int(self.validation_ratio * non_overlapped_cnt)
+
+            slice_idx = 0
+
+            self.v_data.update({class_: []})
+            while v_data_len > 0 and slice_idx < len(self.data[class_]):
+
+                if self.data[class_][slice_idx][0][1] is False:
+
+                    self.v_data[class_].append(self.data[class_][slice_idx])
+                    self.data[class_] = self.data[class_][:slice_idx] + self.data[class_][:slice_idx + 1]
+
+                    v_data_len -= 1
+
+                else:
+                    slice_idx += 1
+
+            for slice_idx in self.data[class_]:
+                self.data[class_][slice_idx] = [[sl[0]] for sl in self.data[class_][slice_idx]]
+
+            for slice_idx in self.v_data[class_]:
+                self.data[class_][slice_idx] = [[sl[0]] for sl in self.data[class_][slice_idx]]
+
+            # ---
 
             print(f"[i] Data (train, human {class_}) timeslice count: {len(self.data[class_])}")
             print(f"[i] Data (validate, human {class_}) timeslice count: {len(self.v_data[class_])}")
@@ -669,7 +713,7 @@ class KeystrokeFingerprintClassificator:
                     Dense(128),
                     ReLU(),
 
-                    #Dropout(0.4),
+                    Dropout(0.4),
 
                     Dense(64),
                     ReLU(),
