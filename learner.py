@@ -80,7 +80,8 @@ class KeystrokeFingerprintClassificator:
         """number of classes (-1 if versus_random is true)"""
 
         self.rnn = rnn
-        """whether the model uses RNN or CNN variations"""
+        """whether the model uses RNN or CNN variations
+            NOTE: if contrastive_learning is False, this parameter has no effect"""
 
         self.versus_random = versus_random
         """whether to include random as a class, or classify only
@@ -389,7 +390,7 @@ class KeystrokeFingerprintClassificator:
             
             if self.rnn:
                 
-                self.encoder = \
+                '''self.encoder = \
                     Sequential([
 
                         InputLayer(input_shape = (self.timeslice_len, 1)),
@@ -403,6 +404,28 @@ class KeystrokeFingerprintClassificator:
                         ReLU(),
 
                         Inception1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        LSTM(256),
+
+                        Flatten()
+                    ])'''
+
+                self.encoder = \
+                    Sequential([
+
+                        InputLayer(input_shape = (self.timeslice_len, 1)),
+
+                        Res1D(16),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Res1D(64),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Res1D(256),
                         BatchNormalization(),
                         ReLU(),
 
@@ -446,11 +469,14 @@ class KeystrokeFingerprintClassificator:
             '''Sequential([
 
                     self.encoder,
-                    
-                    Dense(64),
+
+                    Dense(128),
                     ReLU(),
 
                     Dropout(0.4),
+
+                    Dense(64),
+                    ReLU(),
 
                     Dense(16),
                     ReLU(),
@@ -525,6 +551,8 @@ class KeystrokeFingerprintClassificator:
 
         assert(self.model_state in [ModelState.UNTRAINED, ModelState.TRAINED])
 
+        # train data formatting
+
         train_data = []
         train_data_labels = []
 
@@ -540,6 +568,26 @@ class KeystrokeFingerprintClassificator:
 
         train_data = tf.concat(train_data, axis = 0)
         train_data_labels = tf.concat(train_data_labels, axis = 0)
+
+        # validation data formatting
+
+        validation_data = []
+        validation_data_labels = []
+
+        for class_, d in self.v_data.items():
+
+            validation_data.append(d)
+            validation_data_labels.append(np.full((d.shape[0],), fill_value = class_))
+
+        if self.versus_random:
+            
+            validation_data.append(self.v_random_data)
+            validation_data_labels.append(np.full((self.v_random_data.shape[0],), fill_value = self.human_cnt))
+
+        validation_data = tf.concat(validation_data, axis = 0)
+        validation_data_labels = tf.concat(validation_data_labels, axis = 0)
+        validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 
+                                        self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
         # shuffling
         # not necessary ?
@@ -575,7 +623,8 @@ class KeystrokeFingerprintClassificator:
 
             history = self.model.fit(x = train_data, y = train_data_labels,
                                     batch_size = batch_size,
-                                    epochs = classifier_epochs)
+                                    epochs = classifier_epochs,
+                                    validation_data = (validation_data, validation_data_labels))
 
             return history.history
 
@@ -608,7 +657,7 @@ class KeystrokeFingerprintClassificator:
                     Dense(128),
                     ReLU(),
 
-                    Dropout(0.4),
+                    #Dropout(0.4),
 
                     Dense(64),
                     ReLU(),
@@ -629,7 +678,8 @@ class KeystrokeFingerprintClassificator:
 
             history_snd = self.classifier.fit(x = train_data, y = train_data_labels,
                                                 batch_size = batch_size,
-                                                epochs = classifier_epochs)
+                                                epochs = classifier_epochs,
+                                                validation_data = (validation_data, validation_data_labels))
 
             self.model = self.classifier
 
@@ -753,6 +803,20 @@ class KeystrokeFingerprintClassificator:
                                 color = 'blue',
                                 label = 'loss')
 
+            if 'val_loss' in stats.keys():
+
+                acc_loss_epoch.plot(epoch_axis,
+                                    stats['val_loss'],
+                                    color = 'red',
+                                    label = 'val_loss')
+
+            if 'val_accuracy' in stats.keys():
+
+                acc_loss_epoch.plot(epoch_axis,
+                                    stats['val_accuracy'],
+                                    color = 'orange',
+                                    label = 'val_accuracy')
+
             acc_loss_epoch.legend(loc = "upper left")
             plt.show()
 
@@ -790,6 +854,20 @@ class KeystrokeFingerprintClassificator:
                                         h_snd['loss'],
                                         color = 'blue',
                                         label = 'loss')
+
+            if 'val_loss' in h_snd.keys():
+
+                acc_loss_classifier.plot(epoch_axis_snd,
+                                            h_snd['val_loss'],
+                                            color = 'red',
+                                            label = 'val_loss')
+
+            if 'val_accuracy' in h_snd.keys():
+
+                acc_loss_classifier.plot(epoch_axis_snd,
+                                            h_snd['val_accuracy'],
+                                            color = 'orange',
+                                            label = 'val_accuracy')
 
             acc_loss_classifier.legend(loc = "upper left")
             acc_loss_classifier.grid(True)
