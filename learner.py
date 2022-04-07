@@ -50,6 +50,7 @@ class KeystrokeFingerprintClassificator:
                         new_timeslice_thresh = 4,
                         micros_to_ms = 1000,
                         timeslice_len = 15,
+                        overlap_timeslices = True,
 
                         versus_random = True,
                         random_to_human_ratio = 1.5,
@@ -97,6 +98,11 @@ class KeystrokeFingerprintClassificator:
         """conversion between seconds (raw_data[idx][0]) to 'miliseconds'"""
 
         self.data_paths = data_paths
+        """data paths"""
+
+        self.overlap_timeslices = overlap_timeslices
+        """whether to train with partially overlapping sequences"""
+
         self.new_timeslice_thresh = new_timeslice_thresh
         """threshold (in seconds) that forces a new timeslice"""
 
@@ -242,6 +248,9 @@ class KeystrokeFingerprintClassificator:
                     
                     timeslice_idx += 1
                     data_timeslices.append([])
+
+                    if self.overlap_timeslices and (raw_data[idx][0] - last_t <= self.new_timeslice_thresh):
+                        idx -= self.timeslice_len // 2
 
                     current_timeslice_base = raw_data[idx][0] * self.s_to_ms + raw_data[idx][1] // self.micros_to_ms
                     current_timeslice_len = 0
@@ -390,7 +399,7 @@ class KeystrokeFingerprintClassificator:
             
             if self.rnn:
                 
-                '''self.encoder = \
+                self.encoder = \
                     Sequential([
 
                         InputLayer(input_shape = (self.timeslice_len, 1)),
@@ -410,9 +419,9 @@ class KeystrokeFingerprintClassificator:
                         LSTM(256),
 
                         Flatten()
-                    ])'''
+                    ])
 
-                self.encoder = \
+                '''self.encoder = \
                     Sequential([
 
                         InputLayer(input_shape = (self.timeslice_len, 1)),
@@ -432,7 +441,7 @@ class KeystrokeFingerprintClassificator:
                         LSTM(256),
 
                         Flatten()
-                    ])
+                    ])'''
 
             else:
 
@@ -545,9 +554,12 @@ class KeystrokeFingerprintClassificator:
                             display_history = True):
 
         assert(self.data_state is DataState.READY)
+        assert(self.v_data_state is DataState.READY)
 
         if self.versus_random:
+
             assert(self.random_data_state is DataState.READY)
+            assert(self.v_random_data_state is DataState.READY)
 
         assert(self.model_state in [ModelState.UNTRAINED, ModelState.TRAINED])
 
