@@ -642,8 +642,6 @@ class KeystrokeFingerprintClassificator:
 
         validation_data = tf.concat(validation_data, axis = 0)
         validation_data_labels = tf.concat(validation_data_labels, axis = 0)
-        validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 
-                                        self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
         # shuffling
         # not necessary ?
@@ -672,10 +670,15 @@ class KeystrokeFingerprintClassificator:
 
             nonlocal train_data
             nonlocal train_data_labels
+            nonlocal validation_data
+            nonlocal validation_data_labels
             
             # one-hot encoding
             train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 
                                 self.human_cnt if not self.versus_random else self.human_cnt + 1)
+
+            validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 
+                                        self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
             history = self.model.fit(x = train_data, y = train_data_labels,
                                     batch_size = batch_size,
@@ -688,6 +691,8 @@ class KeystrokeFingerprintClassificator:
 
             nonlocal train_data
             nonlocal train_data_labels
+            nonlocal validation_data
+            nonlocal validation_data_labels
 
             print(f"\n[i] contrastive learning phase started\n")
 
@@ -695,8 +700,9 @@ class KeystrokeFingerprintClassificator:
                                             loss = self._contrastive_loss)
 
             history_fst = self.feature_extractor.fit(x = train_data, y = train_data_labels,
-                                                    batch_size = batch_size,
-                                                    epochs = encoder_epochs)
+                                                        batch_size = batch_size,
+                                                        epochs = encoder_epochs,
+                                                        validation_data = (validation_data, validation_data_labels))
 
             print(f"\n[i] contrastive learning phase ended\n")
             print(f"\n[i] classifier training started\n")
@@ -731,6 +737,9 @@ class KeystrokeFingerprintClassificator:
 
             train_data_labels = tf.keras.utils.to_categorical(train_data_labels, 
                                 self.human_cnt if not self.versus_random else self.human_cnt + 1)
+
+            validation_data_labels = tf.keras.utils.to_categorical(validation_data_labels, 
+                                        self.human_cnt if not self.versus_random else self.human_cnt + 1)
 
             history_snd = self.classifier.fit(x = train_data, y = train_data_labels,
                                                 batch_size = batch_size,
@@ -898,6 +907,13 @@ class KeystrokeFingerprintClassificator:
                                     h_fst['loss'],
                                     color = 'blue',
                                     label = 'loss')
+
+            if 'val_loss' in h_fst.keys():
+
+                loss_contrastive.plot(epoch_axis_fst,
+                                        h_fst['val_loss'],
+                                        color = 'red',
+                                        label = 'val_loss')
 
             loss_contrastive.grid(True)
             
