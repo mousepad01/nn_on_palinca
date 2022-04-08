@@ -182,6 +182,34 @@ class Inception1D_(Layer):
 
         return tf.concat([output_branch0, output_branch1], axis=1)
 
+class Foldl(Layer):
+    """Foldl over slices of input tensor"""
+
+    def __init__(self, timeslice_len, op):
+        super(Foldl, self).__init__()
+
+        self.tslice_len = timeslice_len
+        self.op = op
+
+    def call(self, input_tensor):
+
+        def _loop(total_len, idx, acc, input_tensor, slen):
+            
+            acc = self.op(acc, input_tensor[:, idx * slen: (idx + 1) * slen])
+            idx += 1
+
+            return total_len, idx, acc, input_tensor, slen
+
+        total_len = input_tensor.shape[1]
+        idx = tf.constant(1)
+        acc = input_tensor[:, :idx * self.tslice_len]
+        slen = self.tslice_len
+
+        len_ok = lambda total_len_, idx_, acc_, input_tensor_, slen_ : tf.less(idx_ * slen_, total_len_)
+        
+        _, _, acc, _, _ = tf.while_loop(len_ok, _loop, [total_len, idx, acc, input_tensor, slen])
+        return acc
+
 # https://arxiv.org/pdf/2004.11362.pdf
 # https://keras.io/examples/vision/supervised-contrastive-learning/
 class SupCon(Loss):

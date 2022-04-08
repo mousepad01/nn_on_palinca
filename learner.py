@@ -289,10 +289,11 @@ class KeystrokeFingerprintClassificator:
 
                 assert(len(tslice) <= self.timeslice_len + 1)
 
-                if tslice[0][1] == False:
-                    non_overlapped_cnt += 1
-
                 if len(tslice) == self.timeslice_len + 1:
+                    
+                    if tslice[0][1] == False:
+                        non_overlapped_cnt += 1
+
                     self.data[class_].append(tslice[1:])    # first entry always 0, also add a 'dummy' dimension
 
             random.shuffle(self.data[class_])
@@ -445,28 +446,6 @@ class KeystrokeFingerprintClassificator:
             
             if self.rnn:
                 
-                self.encoder = \
-                    Sequential([
-
-                        InputLayer(input_shape = (self.timeslice_len, 1)),
-
-                        Inception1D(16),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Inception1D(64),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Inception1D(256),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        LSTM(256),
-
-                        Flatten()
-                    ])
-
                 '''self.encoder = \
                     Sequential([
 
@@ -488,6 +467,30 @@ class KeystrokeFingerprintClassificator:
 
                         Flatten()
                     ])'''
+
+                self.encoder = \
+                    Sequential([
+
+                        InputLayer(input_shape = (self.timeslice_len, 1)),
+
+                        Inception1D(16),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(64),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Foldl(self.timeslice_len, tf.add),
+
+                        LSTM(256),
+
+                        Flatten()
+                    ])
 
             else:
 
