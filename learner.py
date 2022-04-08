@@ -15,7 +15,6 @@ from tensorflow.keras.losses import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.activations import *
 
-# silence lots of useless and annoying tensorflow logs
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
@@ -480,6 +479,35 @@ class KeystrokeFingerprintClassificator:
                         Flatten()
                     ])'''
 
+                '''self.encoder = \
+                    Sequential([
+
+                        InputLayer(input_shape = (self.timeslice_len, 1)),
+
+                        Inception1D(16),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(64),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Foldl(self.timeslice_len, tf.add),
+
+                        LSTM(256, return_sequences = True),
+                        BatchNormalization(),
+
+                        Dropout(0.2),
+
+                        LSTM(256),
+
+                        Flatten()
+                    ])'''
+
                 self.encoder = \
                     Sequential([
 
@@ -499,7 +527,15 @@ class KeystrokeFingerprintClassificator:
 
                         Foldl(self.timeslice_len, tf.add),
 
-                        LSTM(256),
+                        LSTM(256, return_sequences = True),
+                        BatchNormalization(),
+
+                        Dropout(0.2),
+
+                        LSTM(512),
+                        BatchNormalization(),
+
+                        Dropout(0.2),
 
                         Flatten()
                     ])
