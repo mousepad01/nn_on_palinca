@@ -407,6 +407,13 @@ class KeystrokeFingerprintClassificator:
 
             assert(self.human_cnt if not self.versus_random else self.human_cnt + 1 <= 16)
             
+            if self.rnn:
+                rnn_layer = [Foldl(self.timeslice_len, tf.add),
+                                LSTM(256)]
+
+            else:
+                rnn_layer = []
+
             self.model = Sequential([
                 InputLayer(input_shape = (self.timeslice_len, 1)),
 
@@ -422,12 +429,17 @@ class KeystrokeFingerprintClassificator:
                 BatchNormalization(),
                 ReLU(),
 
+                *rnn_layer,
+
                 Flatten(),
 
-                Dense(64),
+                Dense(128),
                 ReLU(),
 
                 Dropout(0.4),
+
+                Dense(64),
+                ReLU(),
 
                 Dense(16),
                 ReLU(),
