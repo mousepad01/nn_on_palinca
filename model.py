@@ -44,7 +44,6 @@ class Res1D(Layer):
         output_tensor = self.a1(_tmp)
         return output_tensor
 
-# less optimised?
 class Inception1D(Layer):
     """implementation of a custom inception layer
         does not take parameters, all of them are fixed\n

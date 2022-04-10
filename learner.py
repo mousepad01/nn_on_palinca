@@ -408,7 +408,17 @@ class KeystrokeFingerprintClassificator:
             
             if self.rnn:
                 rnn_layer = [Foldl(self.timeslice_len, tf.add),
-                                LSTM(256)]
+
+                                LSTM(256, return_sequences = True),
+                                BatchNormalization(),
+
+                                Dropout(0.2),
+
+                                LSTM(512),
+                                BatchNormalization(),
+
+                                Dropout(0.2)
+                            ]
 
             else:
                 rnn_layer = []
@@ -936,6 +946,8 @@ class KeystrokeFingerprintClassificator:
                                     label = 'val_accuracy')
 
             acc_loss_epoch.legend(loc = "upper left")
+            acc_loss_epoch.grid(True)
+
             plt.show()
 
         def _plot_contrastive_learning():
@@ -953,8 +965,8 @@ class KeystrokeFingerprintClassificator:
 
             fig, (loss_contrastive, acc_loss_classifier) = plt.subplots(2)
 
-            loss_contrastive.set_title("Encoder trainig loss")
-            acc_loss_classifier.set_title("Classifier training loss and accuracy")
+            loss_contrastive.set_title("Encoder train phase")
+            acc_loss_classifier.set_title("Classifier train phase")
 
             loss_contrastive.plot(epoch_axis_fst,
                                     h_fst['loss'],
@@ -968,6 +980,7 @@ class KeystrokeFingerprintClassificator:
                                         color = 'red',
                                         label = 'val_loss')
 
+            loss_contrastive.legend(loc = "upper left")
             loss_contrastive.grid(True)
             
             acc_loss_classifier.plot(epoch_axis_snd,
