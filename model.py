@@ -62,7 +62,7 @@ class Inception1D(Layer):
         self.conv_b0_1 = Conv1D(filters=filters, kernel_size=3, padding='same')
         self.n_b0_1 = BatchNormalization()
 
-        self.conv_id_b0 = Conv1D(filters=filters, kernel_size=1)
+        self.conv_proj_b0 = Conv1D(filters=filters, kernel_size=1)
 
         # branch 1
 
@@ -74,7 +74,7 @@ class Inception1D(Layer):
         self.conv_b1_1 = Conv1D(filters=filters, kernel_size=3, padding='same')
         self.n_b1_1 = BatchNormalization()
         
-        self.conv_id_b1 = Conv1D(filters=filters, kernel_size=1)
+        self.conv_proj_b1 = Conv1D(filters=filters, kernel_size=1)
 
         # final
 
@@ -91,7 +91,7 @@ class Inception1D(Layer):
         _tmp = self.conv_b0_1(_tmp)
         output_branch0 = self.n_b0_1(_tmp)
 
-        _tmp2 = self.conv_id_b0(input_tensor)
+        _tmp2 = self.conv_proj_b0(input_tensor)
         output_branch0 += _tmp2
 
         # branch 1
@@ -104,7 +104,7 @@ class Inception1D(Layer):
         _tmp = self.conv_b1_1(_tmp)
         output_branch1 = self.n_b1_1(_tmp)
 
-        _tmp2 = self.conv_id_b1(input_tensor)
+        _tmp2 = self.conv_proj_b1(input_tensor)
         output_branch1 += _tmp2
 
         # concatenation
