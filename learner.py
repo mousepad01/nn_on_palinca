@@ -216,20 +216,14 @@ class KeystrokeFingerprintClassificator:
                 
         min_data_len = 2 ** 100
 
-        for class_ in data_bufs.keys():
-            min_data_len = min(min_data_len, len(data_bufs[class_]))
-
-        for class_ in data_bufs.keys():
-            
-            start_moment = random.randint(0, len(data_bufs[class_]) - min_data_len)
-            data_bufs[class_] = data_bufs[class_][start_moment: start_moment + min_data_len]
-
         self.data = data_bufs
         self.data_state = DataState.RAW
 
     def format_data(self):
         """* make timestamps relative to one another
             * split in different timeslices"""
+
+        '''split in timeslices'''
 
         for class_, raw_data in self.data.items():
 
@@ -281,51 +275,76 @@ class KeystrokeFingerprintClassificator:
                 last_t = raw_data[idx][0]
                 idx += 1
 
-            non_overlapped_cnt = 0
-
             self.data[class_] = []
             for tslice in data_timeslices:
 
                 assert(len(tslice) <= self.timeslice_len + 1)
 
                 if len(tslice) == self.timeslice_len + 1:
-                    
-                    if tslice[0][1] == False:
-                        non_overlapped_cnt += 1
-
                     self.data[class_].append(tslice[1:])    # first entry always 0, also add a 'dummy' dimension
 
             random.shuffle(self.data[class_])
 
-            # separate train data from validation data
+        '''separate overlapping and non-overlapping timeslices for each class'''
 
-            v_data_len = int(self.validation_ratio * non_overlapped_cnt)
+        tslices = {class_: {'overlapping': [], 'non_overlapping': []} for class_ in self.data.keys()}
 
-            slice_idx = 0
+        for class_ in self.data.keys():
+            for tslice in self.data[class_]:
 
-            self.v_data.update({class_: []})
-            while v_data_len > 0 and slice_idx < len(self.data[class_]):
-
-                if self.data[class_][slice_idx][0][1] is False:
-
-                    self.v_data[class_].append(self.data[class_][slice_idx])
-                    self.data[class_] = self.data[class_][:slice_idx] + self.data[class_][slice_idx + 1:]
-
-                    v_data_len -= 1
+                if tslice[0][1] == False:
+                    tslices[class_]['non_overlapping'].append(tslice)
 
                 else:
-                    slice_idx += 1
+                    tslices[class_]['overlapping'].append(tslice)
+
+        '''determine minimum of overlapping / non overlapping timeslices
+            and validation count'''
+
+        min_non_overlapping_cnt = 2 ** 100
+        min_overlapping_cnt = 2 ** 100
+
+        for class_ in self.data.keys():
+
+            if len(tslices[class_]['overlapping']) < min_overlapping_cnt:
+                min_overlapping_cnt = len(tslices[class_]['overlapping'])
+
+            if len(tslices[class_]['non_overlapping']) < min_non_overlapping_cnt:
+                min_non_overlapping_cnt = len(tslices[class_]['non_overlapping'])
+
+        validation_cnt = int(self.validation_ratio * min_non_overlapping_cnt)
+
+        '''truncate excess timeslices'''
+
+        for class_ in self.data.keys():
+
+            tslices[class_]['overlapping'] = tslices[class_]['overlapping'][:min_overlapping_cnt]
+            tslices[class_]['non_overlapping'] = tslices[class_]['non_overlapping'][:min_non_overlapping_cnt]
+
+        '''re-populate self.data, fill self.v_data'''
+
+        for class_ in self.data.keys():
+
+            self.data[class_] = tslices[class_]['overlapping'] + tslices[class_]['non_overlapping'][validation_cnt:]
+            self.v_data[class_] = tslices[class_]['non_overlapping'][:validation_cnt]
+
+            assert(len(self.v_data[class_]) == validation_cnt)
+            assert(len(self.data[class_]) == min_overlapping_cnt + min_non_overlapping_cnt - validation_cnt)
+
+        print(f"[i] Train data timeslice count per class: {min_overlapping_cnt + min_non_overlapping_cnt - validation_cnt} ({min_overlapping_cnt} overlapping)")
+        print(f"[i] Validation data timeslice count per class: {validation_cnt} (0 overlapping)")
+
+        '''conversion to np.array'''
+
+        for class_ in self.data.keys():
+
+            '''first, eliminate the overlapping boolean attribute'''
 
             for slice_idx in range(len(self.data[class_])):
                 self.data[class_][slice_idx] = [[sl[0]] for sl in self.data[class_][slice_idx]]
 
             for slice_idx in range(len(self.v_data[class_])):
                 self.v_data[class_][slice_idx] = [[sl[0]] for sl in self.v_data[class_][slice_idx]]
-
-            # ---
-
-            print(f"[i] Data (train, human {class_}) timeslice count: {len(self.data[class_])}")
-            print(f"[i] Data (validate, human {class_}) timeslice count: {len(self.v_data[class_])}")
 
             self.data[class_] = np.array(self.data[class_], dtype = np.float32)
             self.v_data[class_] = np.array(self.v_data[class_], dtype = np.float32)
