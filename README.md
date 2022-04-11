@@ -1,3 +1,3 @@
 # Can a simple neural network model predict who's behind keystrokes?
-The answer: kind of
+The answer: as always, it depends :)
 The documentation: documentation.pdf
