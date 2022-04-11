@@ -489,7 +489,7 @@ class KeystrokeFingerprintClassificator:
 
                 '''residual blocks instead of inception blocks'''
 
-                '''self.encoder = \
+                self.encoder = \
                     Sequential([
 
                         InputLayer(input_shape = (self.timeslice_len, 1)),
@@ -519,9 +519,9 @@ class KeystrokeFingerprintClassificator:
                         #Dropout(0.2),
 
                         Flatten()
-                    ])'''
+                    ])
 
-                self.encoder = \
+                '''self.encoder = \
                     Sequential([
 
                         InputLayer(input_shape = (self.timeslice_len, 1)),
@@ -551,7 +551,7 @@ class KeystrokeFingerprintClassificator:
                         #Dropout(0.2),
 
                         Flatten()
-                    ])
+                    ])'''
 
             else:
 
