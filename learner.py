@@ -487,6 +487,40 @@ class KeystrokeFingerprintClassificator:
             
             if self.rnn:
 
+                '''residual blocks instead of inception blocks'''
+
+                '''self.encoder = \
+                    Sequential([
+
+                        InputLayer(input_shape = (self.timeslice_len, 1)),
+
+                        Res1D(16),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Res1D(64),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Res1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        # no need for folded sum here
+
+                        LSTM(256, return_sequences = True),
+                        BatchNormalization(),
+
+                        #Dropout(0.2),
+
+                        LSTM(512),
+                        BatchNormalization(),
+
+                        #Dropout(0.2),
+
+                        Flatten()
+                    ])'''
+
                 self.encoder = \
                     Sequential([
 
