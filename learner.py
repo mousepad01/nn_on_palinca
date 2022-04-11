@@ -431,12 +431,12 @@ class KeystrokeFingerprintClassificator:
                                 LSTM(256, return_sequences = True),
                                 BatchNormalization(),
 
-                                Dropout(0.2),
+                                #Dropout(0.2),
 
                                 LSTM(512),
                                 BatchNormalization(),
 
-                                Dropout(0.2)
+                                #Dropout(0.2),
                             ]
 
             else:
@@ -537,10 +537,6 @@ class KeystrokeFingerprintClassificator:
                         BatchNormalization(),
                         ReLU(),
 
-                        Inception1D(512),
-                        BatchNormalization(),
-                        ReLU(),
-
                         Flatten()
                     ])
 
@@ -555,8 +551,6 @@ class KeystrokeFingerprintClassificator:
 
             self.classifier = None # later, after training
             '''Sequential([
-
-                    self.encoder,
 
                     Dense(128),
                     ReLU(),
@@ -875,11 +869,14 @@ class KeystrokeFingerprintClassificator:
     # stats, other varius methods
 
     def seed(self, seed = 0):
-        """set seed for all rnd"""
+        """set seed for all rnd
+            NOTE: this does NOT guarantee exact same results
+                    there appears to be other (uncontrollable?) 
+                    randomness sources such as from GPU-related processing"""
 
         random.seed(seed)
-        tf.random.set_seed(seed)
         np.random.seed(seed)
+        tf.random.set_seed(seed)
 
     def display_stats(self, stats: dict, contrastive_learning: bool = False):
         """display stats
