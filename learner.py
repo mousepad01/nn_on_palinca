@@ -485,57 +485,6 @@ class KeystrokeFingerprintClassificator:
         def _init_contrastive_model():
             
             if self.rnn:
-                
-                '''self.encoder = \
-                    Sequential([
-
-                        InputLayer(input_shape = (self.timeslice_len, 1)),
-
-                        Res1D(16),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Res1D(64),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Res1D(256),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        LSTM(256),
-
-                        Flatten()
-                    ])'''
-
-                '''self.encoder = \
-                    Sequential([
-
-                        InputLayer(input_shape = (self.timeslice_len, 1)),
-
-                        Inception1D(16),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Inception1D(64),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Inception1D(256),
-                        BatchNormalization(),
-                        ReLU(),
-
-                        Foldl(self.timeslice_len, tf.add),
-
-                        LSTM(256, return_sequences = True),
-                        BatchNormalization(),
-
-                        Dropout(0.2),
-
-                        LSTM(256),
-
-                        Flatten()
-                    ])'''
 
                 self.encoder = \
                     Sequential([
@@ -559,12 +508,12 @@ class KeystrokeFingerprintClassificator:
                         LSTM(256, return_sequences = True),
                         BatchNormalization(),
 
-                        Dropout(0.2),
+                        #Dropout(0.2),
 
                         LSTM(512),
                         BatchNormalization(),
 
-                        Dropout(0.2),
+                        #Dropout(0.2),
 
                         Flatten()
                     ])
@@ -585,6 +534,10 @@ class KeystrokeFingerprintClassificator:
                         ReLU(),
 
                         Inception1D(256),
+                        BatchNormalization(),
+                        ReLU(),
+
+                        Inception1D(512),
                         BatchNormalization(),
                         ReLU(),
 
