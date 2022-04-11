@@ -462,14 +462,15 @@ class KeystrokeFingerprintClassificator:
                 Flatten(),
 
                 Dense(128),
+                BatchNormalization(),
                 ReLU(),
 
-                Dropout(0.4),
-
                 Dense(64),
+                BatchNormalization(),
                 ReLU(),
 
                 Dense(16),
+                BatchNormalization(),
                 ReLU(),
 
                 Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
@@ -552,15 +553,18 @@ class KeystrokeFingerprintClassificator:
             self.classifier = None # later, after training
             '''Sequential([
 
+                    self.encoder,
+
                     Dense(128),
+                    BatchNormalization(),
                     ReLU(),
 
-                    Dropout(0.4),
-
                     Dense(64),
+                    BatchNormalization(),
                     ReLU(),
 
                     Dense(16),
+                    BatchNormalization(),
                     ReLU(),
 
                     Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
@@ -746,14 +750,15 @@ class KeystrokeFingerprintClassificator:
                     self.encoder,
 
                     Dense(128),
+                    BatchNormalization(),
                     ReLU(),
 
-                    Dropout(0.4),
-
                     Dense(64),
+                    BatchNormalization(),
                     ReLU(),
 
                     Dense(16),
+                    BatchNormalization(),
                     ReLU(),
 
                     Dense(self.human_cnt if not self.versus_random else self.human_cnt + 1),
@@ -872,7 +877,8 @@ class KeystrokeFingerprintClassificator:
         """set seed for all rnd
             NOTE: this does NOT guarantee exact same results
                     there appears to be other (uncontrollable?) 
-                    randomness sources such as from GPU-related processing"""
+                    randomness sources such as from 
+                    GPU-related processing"""
 
         random.seed(seed)
         np.random.seed(seed)
