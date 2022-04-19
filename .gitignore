@@ -1,7 +1,7 @@
 .idea/
 **/__pycache__/
 /.vscode
-*timestamps*
+#*timestamps*
 /model_data*
 local*
 /local
